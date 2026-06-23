@@ -1,9 +1,9 @@
 """
-Fanoron-telo (Bitboard + Skins & Palette + Démo IA vs IA)
-==========================================================
+Fanoron-telo (Bitboard + Skins & Palette + Démo IA vs IA + Undo/Redo + Perf)
+================================================================================
 Jeu de stratégie malgache avec moteur bitboard, IA (facile/moyen/difficile),
-skins de pions, palettes de couleurs, annulation de coup et mode démonstration
-automatique (IA contre IA).
+skins de pions, palettes de couleurs, annulation/rétablissement de coup,
+mode démonstration automatique (IA contre IA) et mesure du temps de l'IA.
 """
 
 import arcade
@@ -345,6 +345,7 @@ class FanoronteloView(arcade.View):
         self.game_mode = "HvH"          # "HvH", "HvIA", "demo"
         self.ai_difficulty = "facile"
         self.demo_mode = False          # True si on est en mode IA vs IA
+        self.demo_difficulty = "facile"
 
         self.node_screen_pos = {}
         self.update_node_positions()
@@ -363,12 +364,17 @@ class FanoronteloView(arcade.View):
         self.winning_line = None
 
         self.undo_stack = []
+        self.redo_stack = []           # pour le rétablissement
         self.current_skin = PieceSkin.CIRCLE
         self.current_palette = "Classique"
         self.show_menu = False
 
         self.undo_button = UndoButton(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 200)
         self.menu_button = MenuButton(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 260)
+
+        # Performance de l'IA
+        self.last_ia_time_ms = 0.0
+        self.demo_next_move_time = 0.0  # pour ralentir la démo
 
         self.reset_game()
 
@@ -390,8 +396,8 @@ class FanoronteloView(arcade.View):
         self.demo_difficulty = difficulty
         self.demo_mode = True
         self.reset_game()
-        # Premier déclenchement de l'IA dans on_update
         self.message = f"Démo IA vs IA ({difficulty}) — Réflexion..."
+        self.demo_next_move_time = time.time() + 0.5  # petit délai avant le premier coup
 
     def reset_game(self):
         self.engine.reset()
@@ -404,6 +410,7 @@ class FanoronteloView(arcade.View):
         self.flying_from = None
         self.flying_to = None
         self.undo_stack.clear()
+        self.redo_stack.clear()
 
         if self.game_mode == "demo":
             mode_str = f"Démo IA vs IA ({self.demo_difficulty})"
@@ -413,14 +420,24 @@ class FanoronteloView(arcade.View):
             mode_str = " vs Humain"
         self.message = f"Déplacez un pion — Joueur {PLAYER_COLORS[1]['name']}{mode_str}"
 
+    # ---------- Undo / Redo ----------
     def save_state(self):
+        # En mode HvIA, on ne sauvegarde que lorsque c'est au tour du joueur humain (tour 1)
+        # pour qu'un seul Undo annule le coup humain + la réponse IA.
+        if self.game_mode == "HvIA" and self.engine.tour != 1:
+            return
+        if self.demo_mode:
+            return
         self.undo_stack.append((self.engine.copier(), self.message))
+        self.redo_stack.clear()   # tout nouveau mouvement vide la pile de redo
         if len(self.undo_stack) > 50:
             self.undo_stack.pop(0)
 
     def undo(self):
         if not self.undo_stack or self.fly_anim is not None:
             return
+        # Sauvegarder l'état actuel dans la pile redo
+        self.redo_stack.append((self.engine.copier(), self.message))
         engine_copy, msg = self.undo_stack.pop()
         self.engine = engine_copy
         self.selected_node = None
@@ -431,6 +448,22 @@ class FanoronteloView(arcade.View):
         self.flying_from = None
         self.flying_to = None
         self.message = f"↩ Annulation — {msg}"
+
+    def redo(self):
+        if not self.redo_stack or self.fly_anim is not None:
+            return
+        # Sauvegarder l'état actuel dans la pile undo
+        self.undo_stack.append((self.engine.copier(), self.message))
+        engine_copy, msg = self.redo_stack.pop()
+        self.engine = engine_copy
+        self.selected_node = None
+        self.winner = None
+        self.winning_line = None
+        self.piece_bounce = {}
+        self.fly_anim = None
+        self.flying_from = None
+        self.flying_to = None
+        self.message = f"↪ Rétablissement — {msg}"
 
     def node_at_pixel(self, x, y):
         best, best_d = None, 1e9
@@ -514,6 +547,10 @@ class FanoronteloView(arcade.View):
             self.message = f"🏆 Joueur {PLAYER_COLORS[player]['name']} a gagné !"
             return
 
+        # Ralentir la démo après chaque coup
+        if self.demo_mode:
+            self.demo_next_move_time = time.time() + 1.5   # 1.5 seconde de pause
+
         self.switch_player()
 
     def switch_player(self):
@@ -526,10 +563,11 @@ class FanoronteloView(arcade.View):
             self.message = f"L'IA ({self.demo_difficulty if self.demo_mode else self.ai_difficulty}) réfléchit..."
             src_idx, dst_idx = None, None
 
+            t_start = time.perf_counter()
+
             if self.ai_difficulty in ["facile", "moyen"]:
                 prochain_etat = moteur_ia.obtenir_coup_ia(self.engine, niveau=self.ai_difficulty)
                 if prochain_etat:
-                    # Retrouver le pion bougé
                     if self.engine.tour == 2:
                         ancien_bb = self.engine.bitboard_p2
                         nouveau_bb = prochain_etat.bitboard_p2
@@ -546,6 +584,9 @@ class FanoronteloView(arcade.View):
                     self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'), joueur_max=self.engine.tour
                 )
 
+            t_end = time.perf_counter()
+            self.last_ia_time_ms = (t_end - t_start) * 1000
+
             if src_idx is not None and dst_idx is not None:
                 self._start_fly(NODE_IDS[src_idx], NODE_IDS[dst_idx])
             else:
@@ -558,7 +599,7 @@ class FanoronteloView(arcade.View):
             self.message = f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']}{mode_str} — Sélectionnez un pion"
 
     # ----------------------------------------------------------------------
-    # ENTRÉES MOUSE & KEYBOARD
+    # ENTRÉES
     # ----------------------------------------------------------------------
     def on_mouse_motion(self, x, y, dx, dy):
         self.menu_button.on_mouse_motion(x, y)
@@ -625,6 +666,13 @@ class FanoronteloView(arcade.View):
             self.reset_game()
         elif key == arcade.key.U:
             self.undo()
+        elif key == arcade.key.Y:
+            self.redo()
+        elif key == arcade.key.M:
+            # Retour à l'accueil
+            from accueil import AccueilView
+            accueil = AccueilView()
+            self.window.show_view(accueil)
         elif key == arcade.key.ESCAPE:
             if self.show_menu:
                 self.show_menu = False
@@ -661,12 +709,13 @@ class FanoronteloView(arcade.View):
             self.fly_anim.update(delta_time)
             if self.fly_anim.done:
                 self._finish_fly()
-        # En mode démo, si aucune animation et pas de vainqueur, on relance le prochain coup IA
+        # En mode démo, on attend le délai avant de lancer le prochain coup
         if self.demo_mode and not self.winner and self.fly_anim is None:
-            self.switch_player()
+            if time.time() >= self.demo_next_move_time:
+                self.switch_player()
 
     # ----------------------------------------------------------------------
-    # RENDU (interface originale, sans ShapeElementList ni arcade.Text)
+    # RENDU
     # ----------------------------------------------------------------------
     def on_draw(self):
         self.clear()
@@ -677,8 +726,8 @@ class FanoronteloView(arcade.View):
         self.draw_fly_piece()
         self.draw_hud()
 
-        enabled = bool(self.undo_stack) and self.fly_anim is None
-        self.undo_button.draw(enabled)
+        enabled_undo = bool(self.undo_stack) and self.fly_anim is None and not self.demo_mode
+        self.undo_button.draw(enabled_undo)
         self.menu_button.draw(active=self.show_menu)
 
         if self.show_menu:
@@ -856,18 +905,21 @@ class FanoronteloView(arcade.View):
         w = self.window.width
         h = self.window.height
 
-        # Bandeau haut
         arcade.draw_lrbt_rectangle_filled(0, w, h-64, h, (12, 14, 22, 230))
         arcade.draw_text("FANORON-TELO", 24, h-40, (240,220,170), 22, bold=True, anchor_y="center")
 
-        # Message
         if self.winner:
             color = (255, 215, 110)
         else:
             color = PLAYER_COLORS[self.engine.tour]["light"]
-        arcade.draw_text(self.message, 24, h-90, color, 15)
 
-        # Pions bougés
+        # Affichage du message + temps IA éventuel
+        msg = self.message
+        if self.last_ia_time_ms > 0 and not self.winner:
+            if self.demo_mode or (self.game_mode == "HvIA" and self.engine.tour == 2):
+                msg += f"  ({self.last_ia_time_ms:.0f} ms)"
+        arcade.draw_text(msg, 24, h-90, color, 15)
+
         if not self.winner:
             moved_p1 = bin(self.engine.moved_once_p1).count("1")
             moved_p2 = bin(self.engine.moved_once_p2).count("1")
@@ -875,12 +927,13 @@ class FanoronteloView(arcade.View):
             arcade.draw_text(f"Bleu — pions bougés : {moved_p2}/3", w//2, h-120, PLAYER_COLORS[2]["light"], 12)
             self.draw_piece(w-60, h-32, self.engine.tour, node_id=None)
 
-        # Bandeau bas
         arcade.draw_lrbt_rectangle_filled(0, w, 0, 40, (12,14,22,230))
-        arcade.draw_text("Clic : sélectionner / déplacer   |   R : recommencer   |   U : undo   |   Échap : quitter", 24, 20, (170,170,185), 12, anchor_y="center")
+        arcade.draw_text(
+            "Clic : sélectionner / déplacer   |   R : recommencer   |   U : undo   |   Y : redo   |   M : menu   |   Échap : quitter",
+            24, 20, (170,170,185), 11, anchor_y="center"
+        )
         arcade.draw_text("Règle : aligner 3 pions ayant tous bougé", w - 24, 20, (130, 130, 150), 11, anchor_x="right", anchor_y="center")
 
-        # Popup victoire
         if self.winner:
             bw, bh = 360, 120
             bx, by = w/2 - bw/2, h/2 - bh/2 - 30
