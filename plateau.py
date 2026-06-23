@@ -15,13 +15,13 @@ class FanoronTelo:
         0x054   # Diagonale Secondaire : 2, 4, 6    (001010100)
     ]
     
-    # Graphe d'adjacence officiel du Fanoron-telo (Masques de mouvements autorisés)
+    # Graphe d'adjacence du Fanoron-telo (Masques de mouvements autorisés)
     ADJACENCY_MASKS = {
         0: 0x01A,  # Lié à 1, 3, 4      (000011010)
         1: 0x01D,  # Lié à 0, 2, 4      (000011101)
         2: 0x032,  # Lié à 1, 4, 5      (000110010)
         3: 0x093,  # Lié à 0, 4, 6      (010010011)
-        4: 0x1FF,  # Le centre est lié à absolument tout le monde !
+        4: 0x1FF,  # Le centre est lié à absolument tout le monde
         5: 0x1C4,  # Lié à 2, 4, 8      (111000100)
         6: 0x098,  # Lié à 3, 4, 7      (010011000)
         7: 0x158,  # Lié à 6, 4, 8      (101011000)
