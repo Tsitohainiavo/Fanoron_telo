@@ -1,8 +1,9 @@
 """
-FANORONTELO TELO 3D (Bitboard + Skins & Palette)
-=================================================
+Fanoron-telo (Bitboard + Skins & Palette + Démo IA vs IA)
+==========================================================
 Jeu de stratégie malgache avec moteur bitboard, IA (facile/moyen/difficile),
-skins de pions, palettes de couleurs et annulation de coup.
+skins de pions, palettes de couleurs, annulation de coup et mode démonstration
+automatique (IA contre IA).
 """
 
 import arcade
@@ -18,7 +19,7 @@ import moteur_ia
 
 SCREEN_WIDTH  = 1000
 SCREEN_HEIGHT = 760
-SCREEN_TITLE  = "Fanorontelo Telo 3D"
+SCREEN_TITLE  = "Fanoron-telo"
 
 COLOR_BG_TOP        = (20,  24,  38)
 COLOR_BG_BOTTOM     = (10,  12,  20)
@@ -38,7 +39,6 @@ class PieceSkin(Enum):
     STAR = "Étoile"
     HEXAGON = "Hexagone"
 
-# Palette par défaut
 PLAYER_COLORS = {
     1: {"base": (224,  86,  86), "light": (255, 150, 130), "dark": (120, 30,  30),  "name": "Rouge"},
     2: {"base": ( 70, 150, 235), "light": (150, 210, 255), "dark": ( 20, 60, 120),  "name": "Bleu"},
@@ -186,6 +186,23 @@ class FanoronteloEngine:
         copie.moved_once_p2 = self.moved_once_p2
         return copie
 
+    def get_successeurs(self):
+        """Génère la liste des états successeurs légaux (utilisé par l'IA)."""
+        successeurs = []
+        occupied = self.get_occupied()
+        bb_actuel = self.bitboard_p1 if self.tour == 1 else self.bitboard_p2
+
+        for src in range(9):
+            if (bb_actuel & (1 << src)) != 0:
+                destinations_possibles = ADJACENCY_MASKS[src] & ~occupied
+                for dst in range(9):
+                    if (destinations_possibles & (1 << dst)) != 0:
+                        enfant = self.copier()
+                        enfant.valider_et_deplacer(src, dst)
+                        enfant.tour = 2 if enfant.tour == 1 else 1
+                        successeurs.append(enfant)
+        return successeurs
+
 
 class FlyAnimation:
     def __init__(self, src_pos, dst_pos, player, duration=FLY_DURATION):
@@ -325,8 +342,9 @@ class FanoronteloView(arcade.View):
         self.board_cy = SCREEN_HEIGHT / 2 + 10
         self.scale    = 230
 
-        self.game_mode = "HvH"
+        self.game_mode = "HvH"          # "HvH", "HvIA", "demo"
         self.ai_difficulty = "facile"
+        self.demo_mode = False          # True si on est en mode IA vs IA
 
         self.node_screen_pos = {}
         self.update_node_positions()
@@ -363,11 +381,17 @@ class FanoronteloView(arcade.View):
     def configure_game(self, mode, diff):
         self.game_mode = mode
         self.ai_difficulty = diff
+        self.demo_mode = False
         self.reset_game()
 
-    def on_show_view(self):
-        arcade.set_background_color((15, 17, 26))
-        self.on_resize(self.window.width, self.window.height)
+    def configure_demo(self, difficulty="facile"):
+        """Lance un affrontement IA vs IA (démo automatique)."""
+        self.game_mode = "demo"
+        self.demo_difficulty = difficulty
+        self.demo_mode = True
+        self.reset_game()
+        # Premier déclenchement de l'IA dans on_update
+        self.message = f"Démo IA vs IA ({difficulty}) — Réflexion..."
 
     def reset_game(self):
         self.engine.reset()
@@ -381,7 +405,12 @@ class FanoronteloView(arcade.View):
         self.flying_to = None
         self.undo_stack.clear()
 
-        mode_str = f" vs IA ({self.ai_difficulty})" if self.game_mode == "HvIA" else " vs Humain"
+        if self.game_mode == "demo":
+            mode_str = f"Démo IA vs IA ({self.demo_difficulty})"
+        elif self.game_mode == "HvIA":
+            mode_str = f" vs IA ({self.ai_difficulty})"
+        else:
+            mode_str = " vs Humain"
         self.message = f"Déplacez un pion — Joueur {PLAYER_COLORS[1]['name']}{mode_str}"
 
     def save_state(self):
@@ -492,15 +521,21 @@ class FanoronteloView(arcade.View):
         if self.winner:
             return
 
-        if self.game_mode == "HvIA" and self.engine.tour == 2:
-            self.message = f"L'IA ({self.ai_difficulty}) réfléchit..."
+        # Mode Démo ou tour de l'IA en mode HvIA
+        if self.demo_mode or (self.game_mode == "HvIA" and self.engine.tour == 2):
+            self.message = f"L'IA ({self.demo_difficulty if self.demo_mode else self.ai_difficulty}) réfléchit..."
             src_idx, dst_idx = None, None
 
             if self.ai_difficulty in ["facile", "moyen"]:
                 prochain_etat = moteur_ia.obtenir_coup_ia(self.engine, niveau=self.ai_difficulty)
                 if prochain_etat:
-                    ancien_bb = self.engine.bitboard_p2
-                    nouveau_bb = prochain_etat.bitboard_p2
+                    # Retrouver le pion bougé
+                    if self.engine.tour == 2:
+                        ancien_bb = self.engine.bitboard_p2
+                        nouveau_bb = prochain_etat.bitboard_p2
+                    else:
+                        ancien_bb = self.engine.bitboard_p1
+                        nouveau_bb = prochain_etat.bitboard_p1
                     bit_perdu = ancien_bb & ~nouveau_bb
                     bit_gagne = nouveau_bb & ~ancien_bb
                     if bit_perdu and bit_gagne:
@@ -508,11 +543,16 @@ class FanoronteloView(arcade.View):
                         dst_idx = int(math.log2(bit_gagne))
             elif self.ai_difficulty == "difficile":
                 _, src_idx, dst_idx = alphabeta.alpha_beta(
-                    self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'), joueur_max=2
+                    self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'), joueur_max=self.engine.tour
                 )
 
             if src_idx is not None and dst_idx is not None:
                 self._start_fly(NODE_IDS[src_idx], NODE_IDS[dst_idx])
+            else:
+                if self.demo_mode:
+                    self.message = "Aucun mouvement possible. Partie terminée."
+                else:
+                    self.message = f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']} — Aucun mouvement possible"
         else:
             mode_str = " (IA)" if self.game_mode == "HvIA" else ""
             self.message = f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']}{mode_str} — Sélectionnez un pion"
@@ -527,7 +567,6 @@ class FanoronteloView(arcade.View):
             self.undo_button.on_mouse_motion(x, y)
 
     def on_mouse_press(self, x, y, button, modifiers):
-        # Les boutons sont toujours actifs, même en cas de victoire
         if self.fly_anim is not None:
             return
 
@@ -539,20 +578,16 @@ class FanoronteloView(arcade.View):
             self.undo()
             return
 
-        # Gestion du menu de personnalisation
         if self.show_menu:
             w, h = self.window.width, self.window.height
-            menu_w, menu_h = 440, 550  # hauteur augmentée pour éviter le chevauchement
-            menu_x = w // 2 - menu_w // 2
-            menu_y = h // 2 - menu_h // 2
+            menu_w, menu_h = 440, 550
+            menu_x, menu_y = w // 2 - menu_w // 2, h // 2 - menu_h // 2
 
-            # Bouton de fermeture (croix)
             close_x, close_y = menu_x + menu_w - 30, menu_y + menu_h - 30
             if abs(x - close_x) <= 15 and abs(y - close_y) <= 15:
                 self.show_menu = False
                 return
 
-            # Zone des skins (même séquence que draw_menu)
             row_y = menu_y + menu_h - 70
             for skin in PieceSkin:
                 if (menu_x + 20 < x < menu_x + menu_w - 20 and row_y - 16 < y < row_y + 16):
@@ -560,10 +595,7 @@ class FanoronteloView(arcade.View):
                     return
                 row_y -= 45
 
-            # Titre "PALETTES DE COULEURS" (on saute cette zone)
-            row_y -= 20
-            # Espace avant les palettes
-            row_y -= 30
+            row_y -= 50
             for palette_name in COLOR_PALETTES.keys():
                 if (menu_x + 20 < x < menu_x + menu_w - 20 and row_y - 14 < y < row_y + 14):
                     self.current_palette = palette_name
@@ -572,16 +604,13 @@ class FanoronteloView(arcade.View):
                     return
                 row_y -= 35
 
-            # Clic à l'intérieur du menu (hors boutons) : ne rien faire
             if (menu_x < x < menu_x + menu_w and menu_y < y < menu_y + menu_h):
                 return
-
-            # Clic en dehors du menu : le fermer
             self.show_menu = False
             return
 
-        # Plateau de jeu (bloqué seulement si animation en cours ou si c'est le tour de l'IA)
-        if self.game_mode == "HvIA" and self.engine.tour == 2:
+        # Bloquer les clics humains pendant le mode démo ou le tour de l'IA
+        if self.demo_mode or (self.game_mode == "HvIA" and self.engine.tour == 2):
             return
         node = self.node_at_pixel(x, y)
         if node is not None:
@@ -608,7 +637,6 @@ class FanoronteloView(arcade.View):
         self.board_cy = height / 2 + 10
         self.scale    = min(width, height) * 0.32
         self.update_node_positions()
-        
         if self.fly_anim and self.flying_from and self.flying_to:
             prog = self.fly_anim.progress
             remaining = self.fly_anim.dur * (1 - prog)
@@ -619,14 +647,13 @@ class FanoronteloView(arcade.View):
                 duration=max(remaining, 0.05)
             )
             self.fly_anim = new_anim
-            
         self.undo_button.x = width - 70
         self.undo_button.y = height - 200
         self.menu_button.x = width - 70
         self.menu_button.y = height - 260
 
     # ----------------------------------------------------------------------
-    # RENDU
+    # MISE À JOUR
     # ----------------------------------------------------------------------
     def on_update(self, delta_time):
         self.time_elapsed += delta_time
@@ -634,7 +661,13 @@ class FanoronteloView(arcade.View):
             self.fly_anim.update(delta_time)
             if self.fly_anim.done:
                 self._finish_fly()
+        # En mode démo, si aucune animation et pas de vainqueur, on relance le prochain coup IA
+        if self.demo_mode and not self.winner and self.fly_anim is None:
+            self.switch_player()
 
+    # ----------------------------------------------------------------------
+    # RENDU (interface originale, sans ShapeElementList ni arcade.Text)
+    # ----------------------------------------------------------------------
     def on_draw(self):
         self.clear()
         self.draw_background()
@@ -643,11 +676,11 @@ class FanoronteloView(arcade.View):
         self.draw_nodes_and_pieces()
         self.draw_fly_piece()
         self.draw_hud()
-        
+
         enabled = bool(self.undo_stack) and self.fly_anim is None
         self.undo_button.draw(enabled)
         self.menu_button.draw(active=self.show_menu)
-        
+
         if self.show_menu:
             self.draw_menu()
 
@@ -823,15 +856,18 @@ class FanoronteloView(arcade.View):
         w = self.window.width
         h = self.window.height
 
+        # Bandeau haut
         arcade.draw_lrbt_rectangle_filled(0, w, h-64, h, (12, 14, 22, 230))
-        arcade.draw_text("FANORONTELO TELO 3D", 24, h-40, (240,220,170), 22, bold=True, anchor_y="center")
+        arcade.draw_text("FANORON-TELO", 24, h-40, (240,220,170), 22, bold=True, anchor_y="center")
 
+        # Message
         if self.winner:
             color = (255, 215, 110)
         else:
             color = PLAYER_COLORS[self.engine.tour]["light"]
         arcade.draw_text(self.message, 24, h-90, color, 15)
 
+        # Pions bougés
         if not self.winner:
             moved_p1 = bin(self.engine.moved_once_p1).count("1")
             moved_p2 = bin(self.engine.moved_once_p2).count("1")
@@ -839,10 +875,12 @@ class FanoronteloView(arcade.View):
             arcade.draw_text(f"Bleu — pions bougés : {moved_p2}/3", w//2, h-120, PLAYER_COLORS[2]["light"], 12)
             self.draw_piece(w-60, h-32, self.engine.tour, node_id=None)
 
+        # Bandeau bas
         arcade.draw_lrbt_rectangle_filled(0, w, 0, 40, (12,14,22,230))
         arcade.draw_text("Clic : sélectionner / déplacer   |   R : recommencer   |   U : undo   |   Échap : quitter", 24, 20, (170,170,185), 12, anchor_y="center")
         arcade.draw_text("Règle : aligner 3 pions ayant tous bougé", w - 24, 20, (130, 130, 150), 11, anchor_x="right", anchor_y="center")
 
+        # Popup victoire
         if self.winner:
             bw, bh = 360, 120
             bx, by = w/2 - bw/2, h/2 - bh/2 - 30
@@ -854,7 +892,7 @@ class FanoronteloView(arcade.View):
     def draw_menu(self):
         w = self.window.width
         h = self.window.height
-        menu_w, menu_h = 440, 550   # hauteur augmentée pour ne rien chevaucher
+        menu_w, menu_h = 440, 550
         menu_x = w//2 - menu_w//2
         menu_y = h//2 - menu_h//2
 
@@ -870,7 +908,6 @@ class FanoronteloView(arcade.View):
         arcade.draw_text("✕", close_x, close_y, (255, 100, 100), 20, anchor_x="center", anchor_y="center")
         arcade.draw_lrbt_rectangle_outline(close_x-15, close_x+15, close_y-15, close_y+15, (100, 100, 120), 2)
 
-        # Liste des skins
         y = menu_y + menu_h - 70
         for skin in PieceSkin:
             is_selected = (skin == self.current_skin)
@@ -893,7 +930,6 @@ class FanoronteloView(arcade.View):
                 arcade.draw_text("✓", menu_x + menu_w - 40, y, (100, 255, 100), 16, anchor_y="center")
             y -= 45
 
-        # Titre et palettes
         y -= 20
         arcade.draw_text("PALETTES DE COULEURS", menu_x + 20, y, (200, 200, 210), 13, anchor_x="left")
         y -= 30
@@ -909,7 +945,6 @@ class FanoronteloView(arcade.View):
                 arcade.draw_text("✓", menu_x + menu_w - 40, y, (100, 255, 100), 16, anchor_y="center")
             y -= 35
 
-        # Message d'instruction en bas du menu
         arcade.draw_text("Cliquez sur un skin ou une palette", w//2, menu_y + 15, (130, 130, 150), 12, anchor_x="center")
 
 
@@ -925,7 +960,7 @@ def main():
         resizable=True,
         antialiasing=True
     )
-    window.set_min_size(600, 500)
+    window.set_minimum_size(600, 500)
     view = FanoronteloView()
     window.show_view(view)
     arcade.run()
