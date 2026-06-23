@@ -38,7 +38,7 @@ class PieceSkin(Enum):
     STAR = "Étoile"
     HEXAGON = "Hexagone"
 
-# Palette par défaut (Sera modifiée dynamiquement)
+# Palette par défaut
 PLAYER_COLORS = {
     1: {"base": (224,  86,  86), "light": (255, 150, 130), "dark": (120, 30,  30),  "name": "Rouge"},
     2: {"base": ( 70, 150, 235), "light": (150, 210, 255), "dark": ( 20, 60, 120),  "name": "Bleu"},
@@ -338,17 +338,6 @@ class FanoronteloView(arcade.View):
         self.time_elapsed = 0.0
         self.piece_bounce = {}
 
-        # --- OPTIMISATION PERFORMANCE ---
-        # Le fond (dégradé) et le plateau 3D (faces, contours, lignes) sont
-        # entièrement statiques entre deux redimensionnements de fenêtre : il est
-        # inutile de les redessiner avec ~70 appels arcade.draw_*() à CHAQUE frame.
-        # On les regroupe une seule fois dans des ShapeElementList (un seul appel
-        # GPU par lot) et on ne les reconstruit que lors d'un resize. Construits
-        # réellement dans rebuild_static_shapes(), appelé depuis on_resize().
-        self.background_shapes = None
-        self.board_shapes = None
-        self._hud_texts_ready = False
-
         self.engine = FanoronteloEngine()
         self.selected_node = None
         self.hovered_node = None
@@ -378,7 +367,6 @@ class FanoronteloView(arcade.View):
 
     def on_show_view(self):
         arcade.set_background_color((15, 17, 26))
-        # Déclenche un recalcul complet de la taille pour forcer l'affichage correct sous Linux
         self.on_resize(self.window.width, self.window.height)
 
     def reset_game(self):
@@ -402,7 +390,7 @@ class FanoronteloView(arcade.View):
             self.undo_stack.pop(0)
 
     def undo(self):
-        if not self.undo_stack or self.fly_anim is not None or self.winner is not None:
+        if not self.undo_stack or self.fly_anim is not None:
             return
         engine_copy, msg = self.undo_stack.pop()
         self.engine = engine_copy
@@ -539,6 +527,7 @@ class FanoronteloView(arcade.View):
             self.undo_button.on_mouse_motion(x, y)
 
     def on_mouse_press(self, x, y, button, modifiers):
+        # Les boutons sont toujours actifs, même en cas de victoire
         if self.fly_anim is not None:
             return
 
@@ -550,20 +539,20 @@ class FanoronteloView(arcade.View):
             self.undo()
             return
 
-        if self.winner is not None:
-            return
-
+        # Gestion du menu de personnalisation
         if self.show_menu:
             w, h = self.window.width, self.window.height
-            menu_w, menu_h = 440, 500
-            menu_x, menu_y = w // 2 - menu_w // 2, h // 2 - menu_h // 2
+            menu_w, menu_h = 440, 550  # hauteur augmentée pour éviter le chevauchement
+            menu_x = w // 2 - menu_w // 2
+            menu_y = h // 2 - menu_h // 2
 
+            # Bouton de fermeture (croix)
             close_x, close_y = menu_x + menu_w - 30, menu_y + menu_h - 30
             if abs(x - close_x) <= 15 and abs(y - close_y) <= 15:
                 self.show_menu = False
                 return
 
-            # Clic Skins
+            # Zone des skins (même séquence que draw_menu)
             row_y = menu_y + menu_h - 70
             for skin in PieceSkin:
                 if (menu_x + 20 < x < menu_x + menu_w - 20 and row_y - 16 < y < row_y + 16):
@@ -571,30 +560,27 @@ class FanoronteloView(arcade.View):
                     return
                 row_y -= 45
 
-            # Clic Palettes
-            # BUG CORRIGÉ : draw_menu() décale la position de départ des palettes de
-            # -20 (espace avant le titre "PALETTES DE COULEURS") PUIS -30 (espace
-            # avant la 1ère ligne), soit -50 au total. Ici on ne soustrayait que -30,
-            # donc la zone cliquable était décalée de 20px par rapport à ce qui est
-            # affiché à l'écran : on cliquait sur une palette et c'était parfois une
-            # autre qui était sélectionnée (ou aucune). On aligne exactement sur
-            # draw_menu pour que le clic corresponde au visuel.
-            row_y -= 50
+            # Titre "PALETTES DE COULEURS" (on saute cette zone)
+            row_y -= 20
+            # Espace avant les palettes
+            row_y -= 30
             for palette_name in COLOR_PALETTES.keys():
                 if (menu_x + 20 < x < menu_x + menu_w - 20 and row_y - 14 < y < row_y + 14):
                     self.current_palette = palette_name
-                    # Modification sécurisée sans écraser l'objet global racine
                     PLAYER_COLORS[1].update(COLOR_PALETTES[palette_name][1])
                     PLAYER_COLORS[2].update(COLOR_PALETTES[palette_name][2])
                     return
                 row_y -= 35
 
+            # Clic à l'intérieur du menu (hors boutons) : ne rien faire
             if (menu_x < x < menu_x + menu_w and menu_y < y < menu_y + menu_h):
                 return
 
+            # Clic en dehors du menu : le fermer
             self.show_menu = False
             return
 
+        # Plateau de jeu (bloqué seulement si animation en cours ou si c'est le tour de l'IA)
         if self.game_mode == "HvIA" and self.engine.tour == 2:
             return
         node = self.node_at_pixel(x, y)
@@ -622,9 +608,6 @@ class FanoronteloView(arcade.View):
         self.board_cy = height / 2 + 10
         self.scale    = min(width, height) * 0.32
         self.update_node_positions()
-        self.rebuild_static_shapes(width, height)
-        if self._hud_texts_ready:
-            self.reposition_hud_texts(width, height)
         
         if self.fly_anim and self.flying_from and self.flying_to:
             prog = self.fly_anim.progress
@@ -642,60 +625,8 @@ class FanoronteloView(arcade.View):
         self.menu_button.x = width - 70
         self.menu_button.y = height - 260
 
-    def rebuild_static_shapes(self, width, height):
-        """
-        OPTIMISATION PERFORMANCE :
-        Reconstruit le fond et le plateau 3D en deux lots (ShapeElementList) au lieu
-        de les redessiner avec ~70 appels arcade.draw_*() individuels à CHAQUE frame.
-        Un ShapeElementList envoie tout son contenu au GPU en UN SEUL appel de dessin,
-        donc on ne reconstruit ces lots que lorsque c'est nécessaire (redimensionnement
-        de la fenêtre), jamais à chaque frame de on_draw().
-        """
-        # --- Fond dégradé (statique) ---
-        bg = arcade.shape_list.ShapeElementList()
-        steps = 40
-        band_h = height / steps
-        for i in range(steps):
-            t = i / steps
-            r, g, b = (
-                int(COLOR_BG_BOTTOM[c] + (COLOR_BG_TOP[c] - COLOR_BG_BOTTOM[c]) * t)
-                for c in range(3)
-            )
-            cy = band_h * i + band_h / 2
-            # +1 de hauteur pour éviter les fines lignes de jointure entre bandes
-            bg.append(arcade.shape_list.create_rectangle_filled(width / 2, cy, width + 2, band_h + 1, (r, g, b, 255)))
-        self.background_shapes = bg
-
-        # --- Plateau 3D + lignes du plateau (statique tant que la fenêtre ne change pas) ---
-        board = arcade.shape_list.ShapeElementList()
-        pts   = [self.node_screen_pos[n] for n in ("NO", "NE", "SE", "SO")]
-        depth = 26
-        side_pts = [(x, y - depth) for x, y in pts]
-        n = len(pts)
-        for i in range(n):
-            p1, p2 = pts[i], pts[(i + 1) % n]
-            s1, s2 = side_pts[i], side_pts[(i + 1) % n]
-            board.append(arcade.shape_list.create_polygon([p1, p2, s2, s1], (*COLOR_BOARD_SIDE, 255)))
-
-        shadow_pts = [(x + 14, y - depth - 18) for x, y in pts]
-        board.append(arcade.shape_list.create_polygon(shadow_pts, (0, 0, 0, 110)))
-
-        margin_pts = self._expand(pts, 1.28)
-        board.append(arcade.shape_list.create_polygon(margin_pts, (*COLOR_BOARD_TOP, 255)))
-        board.append(arcade.shape_list.create_line_loop(margin_pts, (*COLOR_BOARD_EDGE, 255), 4))
-
-        inner_pts = self._expand(pts, 1.12)
-        board.append(arcade.shape_list.create_line_loop(inner_pts, (*COLOR_BOARD_EDGE, 255), 2))
-
-        for a, b in EDGES:
-            p1, p2 = self.node_screen_pos[a], self.node_screen_pos[b]
-            board.append(arcade.shape_list.create_line(p1[0] + 2, p1[1] - 3, p2[0] + 2, p2[1] - 3, (*COLOR_LINE_SHADOW, 255), 5))
-            board.append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], (*COLOR_LINE, 255), 3))
-
-        self.board_shapes = board
-
     # ----------------------------------------------------------------------
-    # RENDU ET COUCHES DE DESSIN
+    # RENDU
     # ----------------------------------------------------------------------
     def on_update(self, delta_time):
         self.time_elapsed += delta_time
@@ -713,7 +644,7 @@ class FanoronteloView(arcade.View):
         self.draw_fly_piece()
         self.draw_hud()
         
-        enabled = bool(self.undo_stack) and self.winner is None and self.fly_anim is None
+        enabled = bool(self.undo_stack) and self.fly_anim is None
         self.undo_button.draw(enabled)
         self.menu_button.draw(active=self.show_menu)
         
@@ -721,16 +652,33 @@ class FanoronteloView(arcade.View):
             self.draw_menu()
 
     def draw_background(self):
-        # Le fond est désormais un lot pré-calculé (voir rebuild_static_shapes),
-        # dessiné en un seul appel GPU au lieu de 40 rectangles par frame.
-        if self.background_shapes is not None:
-            self.background_shapes.draw()
+        steps = 40
+        h = self.window.height
+        w = self.window.width
+        for i in range(steps):
+            t = i / steps
+            color = tuple(
+                int(COLOR_BG_BOTTOM[c] + (COLOR_BG_TOP[c] - COLOR_BG_BOTTOM[c]) * t)
+                for c in range(3)
+            )
+            arcade.draw_lrbt_rectangle_filled(0, w, h * t, h * (t + 1/steps), color)
 
     def draw_board_3d(self):
-        # Le plateau 3D (faces + contours) fait partie du même principe de cache
-        # que le fond : voir rebuild_static_shapes(). Rien à faire ici à chaque frame.
-        if self.board_shapes is not None:
-            self.board_shapes.draw()
+        pts   = [self.node_screen_pos[n] for n in ("NO","NE","SE","SO")]
+        depth = 26
+        side_pts = [(x, y - depth) for x, y in pts]
+        n = len(pts)
+        for i in range(n):
+            p1, p2 = pts[i], pts[(i+1)%n]
+            s1, s2 = side_pts[i], side_pts[(i+1)%n]
+            arcade.draw_polygon_filled([p1, p2, s2, s1], COLOR_BOARD_SIDE)
+        shadow_pts = [(x+14, y-depth-18) for x, y in pts]
+        arcade.draw_polygon_filled(shadow_pts, (0, 0, 0, 110))
+        margin_pts = self._expand(pts, 1.28)
+        arcade.draw_polygon_filled(margin_pts, COLOR_BOARD_TOP)
+        arcade.draw_polygon_outline(margin_pts, COLOR_BOARD_EDGE, 4)
+        inner_pts = self._expand(pts, 1.12)
+        arcade.draw_polygon_outline(inner_pts, COLOR_BOARD_EDGE, 2)
 
     @staticmethod
     def _expand(pts, factor):
@@ -739,9 +687,10 @@ class FanoronteloView(arcade.View):
         return [(cx + (x-cx)*factor, cy + (y-cy)*factor) for x, y in pts]
 
     def draw_lines(self):
-        # Les arêtes statiques sont déjà incluses dans self.board_shapes (cache).
-        # Seul le halo pulsant de la ligne gagnante est encore animé/dynamique,
-        # donc redessiné image par image.
+        for a, b in EDGES:
+            p1, p2 = self.node_screen_pos[a], self.node_screen_pos[b]
+            arcade.draw_line(p1[0]+2, p1[1]-3, p2[0]+2, p2[1]-3, COLOR_LINE_SHADOW, 5)
+            arcade.draw_line(p1[0], p1[1], p2[0], p2[1], COLOR_LINE, 3)
         if self.winning_line:
             pts   = [self.node_screen_pos[n] for n in self.winning_line]
             pulse = 0.5 + 0.5*math.sin(self.time_elapsed * 4)
@@ -870,91 +819,42 @@ class FanoronteloView(arcade.View):
             arcade.draw_ellipse_filled(sx+3, sy-6, PIECE_RADIUS*scale*2, PIECE_RADIUS*scale, (0,0,0, shadow_a))
         self.draw_piece(fx, fy, player, selected=False, node_id=None)
 
-    def _init_hud_texts(self):
-        """
-        OPTIMISATION PERFORMANCE :
-        arcade.draw_text() recrée un objet Text à CHAQUE appel — arcade émet
-        d'ailleurs lui-même un avertissement "extremely slow" pour cette fonction.
-        On crée donc une seule fois les textes du HUD en objets arcade.Text, puis
-        à chaque frame on se contente de modifier leurs attributs .text/.color
-        (quasi gratuit), au lieu de recréer le texte à chaque appel.
-        """
-        self.text_title = arcade.Text("FANORONTELO TELO 3D", 24, 0, (240, 220, 170), 22, bold=True, anchor_y="center")
-        self.text_message = arcade.Text(self.message, 24, 0, (255, 255, 255), 15)
-        self.text_moved_p1 = arcade.Text("", 24, 0, PLAYER_COLORS[1]["light"], 12)
-        self.text_moved_p2 = arcade.Text("", 24, 0, PLAYER_COLORS[2]["light"], 12)
-        self.text_controls = arcade.Text(
-            "Clic : sélectionner / déplacer   |   R : recommencer   |   U : undo   |   Échap : quitter",
-            24, 20, (170, 170, 185), 12, anchor_y="center"
-        )
-        self.text_rule = arcade.Text(
-            "Règle : aligner 3 pions ayant tous bougé", 0, 20, (130, 130, 150), 11,
-            anchor_x="right", anchor_y="center"
-        )
-        self.text_winner_title = arcade.Text(self.message, 0, 0, (255, 215, 110), 18, anchor_x="center", bold=True)
-        self.text_winner_sub = arcade.Text("Appuyez sur R pour rejouer", 0, 0, (220, 200, 150), 14, anchor_x="center")
-        self._hud_texts_ready = True
-        self.reposition_hud_texts(self.window.width, self.window.height)
-
-    def reposition_hud_texts(self, width, height):
-        w, h = width, height
-        self.text_title.position = (24, h - 40)
-        self.text_message.position = (24, h - 90)
-        self.text_moved_p1.position = (24, h - 120)
-        self.text_moved_p2.position = (w // 2, h - 120)
-        self.text_controls.position = (24, 20)
-        self.text_rule.x = w - 24
-        bw, bh = 360, 120
-        bx, by = w / 2 - bw / 2, h / 2 - bh / 2 - 30
-        self.text_winner_title.position = (w / 2, by + bh - 35)
-        self.text_winner_sub.position = (w / 2, by + 35)
-
     def draw_hud(self):
         w = self.window.width
         h = self.window.height
 
-        if not self._hud_texts_ready:
-            self._init_hud_texts()
-
         arcade.draw_lrbt_rectangle_filled(0, w, h-64, h, (12, 14, 22, 230))
-        self.text_title.draw()
+        arcade.draw_text("FANORONTELO TELO 3D", 24, h-40, (240,220,170), 22, bold=True, anchor_y="center")
 
         if self.winner:
             color = (255, 215, 110)
         else:
             color = PLAYER_COLORS[self.engine.tour]["light"]
-        self.text_message.text = self.message
-        self.text_message.color = color
-        self.text_message.draw()
+        arcade.draw_text(self.message, 24, h-90, color, 15)
 
         if not self.winner:
             moved_p1 = bin(self.engine.moved_once_p1).count("1")
             moved_p2 = bin(self.engine.moved_once_p2).count("1")
-            self.text_moved_p1.text = f"Rouge — pions bougés : {moved_p1}/3"
-            self.text_moved_p1.color = PLAYER_COLORS[1]["light"]
-            self.text_moved_p2.text = f"Bleu — pions bougés : {moved_p2}/3"
-            self.text_moved_p2.color = PLAYER_COLORS[2]["light"]
-            self.text_moved_p1.draw()
-            self.text_moved_p2.draw()
+            arcade.draw_text(f"Rouge — pions bougés : {moved_p1}/3", 24, h-120, PLAYER_COLORS[1]["light"], 12)
+            arcade.draw_text(f"Bleu — pions bougés : {moved_p2}/3", w//2, h-120, PLAYER_COLORS[2]["light"], 12)
             self.draw_piece(w-60, h-32, self.engine.tour, node_id=None)
 
         arcade.draw_lrbt_rectangle_filled(0, w, 0, 40, (12,14,22,230))
-        self.text_controls.draw()
-        self.text_rule.draw()
+        arcade.draw_text("Clic : sélectionner / déplacer   |   R : recommencer   |   U : undo   |   Échap : quitter", 24, 20, (170,170,185), 12, anchor_y="center")
+        arcade.draw_text("Règle : aligner 3 pions ayant tous bougé", w - 24, 20, (130, 130, 150), 11, anchor_x="right", anchor_y="center")
 
         if self.winner:
             bw, bh = 360, 120
             bx, by = w/2 - bw/2, h/2 - bh/2 - 30
             arcade.draw_lrbt_rectangle_filled(bx, bx+bw, by, by+bh, (20, 22, 36, 240))
             arcade.draw_lrbt_rectangle_outline(bx, bx+bw, by, by+bh, (255,215,110), 3)
-            self.text_winner_title.text = self.message
-            self.text_winner_title.draw()
-            self.text_winner_sub.draw()
+            arcade.draw_text(self.message, w/2, by+bh-35, (255, 215, 110), 18, anchor_x="center", bold=True)
+            arcade.draw_text("Appuyez sur R pour rejouer", w/2, by+35, (220, 200, 150), 14, anchor_x="center")
 
     def draw_menu(self):
         w = self.window.width
         h = self.window.height
-        menu_w, menu_h = 440, 500
+        menu_w, menu_h = 440, 550   # hauteur augmentée pour ne rien chevaucher
         menu_x = w//2 - menu_w//2
         menu_y = h//2 - menu_h//2
 
@@ -993,7 +893,7 @@ class FanoronteloView(arcade.View):
                 arcade.draw_text("✓", menu_x + menu_w - 40, y, (100, 255, 100), 16, anchor_y="center")
             y -= 45
 
-        # Palettes
+        # Titre et palettes
         y -= 20
         arcade.draw_text("PALETTES DE COULEURS", menu_x + 20, y, (200, 200, 210), 13, anchor_x="left")
         y -= 30
@@ -1009,7 +909,8 @@ class FanoronteloView(arcade.View):
                 arcade.draw_text("✓", menu_x + menu_w - 40, y, (100, 255, 100), 16, anchor_y="center")
             y -= 35
 
-        arcade.draw_text("Cliquez sur un skin ou une palette", w//2, menu_y+20, (130, 130, 150), 12, anchor_x="center")
+        # Message d'instruction en bas du menu
+        arcade.draw_text("Cliquez sur un skin ou une palette", w//2, menu_y + 15, (130, 130, 150), 12, anchor_x="center")
 
 
 # ----------------------------------------------------------------------
@@ -1017,8 +918,6 @@ class FanoronteloView(arcade.View):
 # ----------------------------------------------------------------------
 
 def main():
-    # Déclaration explicite du style resizable pour forcer le gestionnaire de fenêtres Linux (X11/Wayland)
-    # à injecter l'icône de maximisation complète (le petit carré)
     window = arcade.Window(
         SCREEN_WIDTH, 
         SCREEN_HEIGHT, 
@@ -1026,9 +925,7 @@ def main():
         resizable=True,
         antialiasing=True
     )
-    # Forcer les limites minimales pour empêcher un écrasement complet
     window.set_min_size(600, 500)
-    
     view = FanoronteloView()
     window.show_view(view)
     arcade.run()
