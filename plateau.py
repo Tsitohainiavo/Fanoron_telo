@@ -130,3 +130,11 @@ class FanoronTelo:
         copie.pions_places_p1 = self.pions_places_p1
         copie.pions_places_p2 = self.pions_places_p2
         return copie
+
+
+class Plateau(FanoronTelo):
+    """Alias de compatibilité pour les scripts de benchmark."""
+    pass
+
+
+__all__ = ["FanoronTelo", "Plateau"]

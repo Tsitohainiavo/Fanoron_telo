@@ -1,0 +1,9 @@
+{
+  "total_parties": 100,
+  "victoires_difficile": 50,
+  "victoires_moyenne": 50,
+  "egalites": 0,
+  "taux_victoire_difficile": 50.0,
+  "temps_reponse_moyen_difficile": 0.001816,
+  "temps_reponse_moyen_moyenne": 0.000202
+}
