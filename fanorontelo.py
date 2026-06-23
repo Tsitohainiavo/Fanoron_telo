@@ -237,6 +237,10 @@ class FlyAnimation:
         return int(90 * (1 - math.sin(p * math.pi) * 0.7))
 
 
+# ----------------------------------------------------------------------
+# BOUTONS DE L'INTERFACE (Undo, Redo, Menu)
+# ----------------------------------------------------------------------
+
 class UndoButton:
     def __init__(self, x, y, size=40):
         self.x = x
@@ -283,7 +287,101 @@ class UndoButton:
         self.clicked = False
 
 
+class RedoButton:
+    def __init__(self, x, y, size=40):
+        self.x = x
+        self.y = y
+        self.size = size
+        self.hovered = False
+        self.clicked = False
+
+    def draw(self, enabled=True):
+        if not enabled:
+            bg_color = (60, 60, 70, 150)
+            icon_color = (100, 100, 110, 150)
+            border_color = (60, 60, 70, 150)
+        elif self.clicked:
+            bg_color = (70, 80, 100, 220)
+            icon_color = (200, 200, 210)
+            border_color = (150, 170, 200)
+        elif self.hovered:
+            bg_color = (60, 70, 90, 220)
+            icon_color = (230, 230, 240)
+            border_color = (180, 200, 230)
+        else:
+            bg_color = (40, 45, 60, 200)
+            icon_color = (200, 200, 210)
+            border_color = (80, 85, 100)
+
+        arcade.draw_circle_filled(self.x, self.y, self.size//2, bg_color)
+        arcade.draw_circle_outline(self.x, self.y, self.size//2, border_color, 2)
+
+        arcade.draw_text("⤻", self.x, self.y - 4, icon_color, 18, anchor_x="center", anchor_y="center")
+        arcade.draw_text("REDO", self.x, self.y - self.size//2 - 12, icon_color, 10, anchor_x="center", bold=True)
+
+    def on_mouse_motion(self, x, y):
+        self.hovered = (x - self.x)**2 + (y - self.y)**2 <= (self.size//2)**2
+        return self.hovered
+
+    def on_mouse_press(self, x, y):
+        if (x - self.x)**2 + (y - self.y)**2 <= (self.size//2)**2:
+            self.clicked = True
+            return True
+        return False
+
+    def on_mouse_release(self):
+        self.clicked = False
+
+
 class MenuButton:
+    """Bouton 'MENU' pour retourner à l'accueil."""
+    def __init__(self, x, y, size=40):
+        self.x = x
+        self.y = y
+        self.size = size
+        self.hovered = False
+        self.clicked = False
+
+    def draw(self, enabled=True):
+        if not enabled:
+            bg_color = (60, 60, 70, 150)
+            icon_color = (100, 100, 110, 150)
+            border_color = (60, 60, 70, 150)
+        elif self.clicked:
+            bg_color = (70, 80, 100, 220)
+            icon_color = (200, 200, 210)
+            border_color = (150, 170, 200)
+        elif self.hovered:
+            bg_color = (60, 70, 90, 220)
+            icon_color = (230, 230, 240)
+            border_color = (180, 200, 230)
+        else:
+            bg_color = (40, 45, 60, 200)
+            icon_color = (200, 200, 210)
+            border_color = (80, 85, 100)
+
+        arcade.draw_circle_filled(self.x, self.y, self.size//2, bg_color)
+        arcade.draw_circle_outline(self.x, self.y, self.size//2, border_color, 2)
+
+        arcade.draw_text("⌂", self.x, self.y - 4, icon_color, 20, anchor_x="center", anchor_y="center")
+        arcade.draw_text("MENU", self.x, self.y - self.size//2 - 12, icon_color, 10, anchor_x="center", bold=True)
+
+    def on_mouse_motion(self, x, y):
+        self.hovered = (x - self.x)**2 + (y - self.y)**2 <= (self.size//2)**2
+        return self.hovered
+
+    def on_mouse_press(self, x, y):
+        if (x - self.x)**2 + (y - self.y)**2 <= (self.size//2)**2:
+            self.clicked = True
+            return True
+        return False
+
+    def on_mouse_release(self):
+        self.clicked = False
+
+
+class SkinMenuButton:
+    """Bouton 'SKIN' pour ouvrir le menu de personnalisation (ancien MenuButton renommé)."""
     def __init__(self, x, y, width=80, height=36):
         self.x = x
         self.y = y
@@ -369,8 +467,11 @@ class FanoronteloView(arcade.View):
         self.current_palette = "Classique"
         self.show_menu = False
 
-        self.undo_button = UndoButton(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 200)
-        self.menu_button = MenuButton(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 260)
+        # Positions initiales (seront ajustées dans on_resize)
+        self.undo_button = UndoButton(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 150)
+        self.redo_button = RedoButton(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 210)
+        self.menu_button = MenuButton(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 270)   # retour accueil
+        self.skin_button = SkinMenuButton(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 330)  # SKIN
 
         # Performance de l'IA
         self.last_ia_time_ms = 0.0
@@ -549,7 +650,7 @@ class FanoronteloView(arcade.View):
 
         # Ralentir la démo après chaque coup
         if self.demo_mode:
-            self.demo_next_move_time = time.time() + 1.5   # 1.5 seconde de pause
+            self.demo_next_move_time = time.time() + 3.0   # 3 secondes de pause
 
         self.switch_player()
 
@@ -602,21 +703,37 @@ class FanoronteloView(arcade.View):
     # ENTRÉES
     # ----------------------------------------------------------------------
     def on_mouse_motion(self, x, y, dx, dy):
-        self.menu_button.on_mouse_motion(x, y)
+        self.skin_button.on_mouse_motion(x, y)
         if self.fly_anim is None and not self.show_menu:
             self.hovered_node = self.node_at_pixel(x, y)
             self.undo_button.on_mouse_motion(x, y)
+            self.redo_button.on_mouse_motion(x, y)
+            self.menu_button.on_mouse_motion(x, y)
 
     def on_mouse_press(self, x, y, button, modifiers):
         if self.fly_anim is not None:
             return
 
-        if self.menu_button.on_mouse_press(x, y):
+        # Bouton SKIN
+        if self.skin_button.on_mouse_press(x, y):
             self.show_menu = not self.show_menu
             return
 
+        # Bouton Undo
         if self.undo_button.on_mouse_press(x, y):
             self.undo()
+            return
+
+        # Bouton Redo
+        if self.redo_button.on_mouse_press(x, y):
+            self.redo()
+            return
+
+        # Bouton Menu (retour accueil)
+        if self.menu_button.on_mouse_press(x, y):
+            from accueil import AccueilView
+            accueil = AccueilView()
+            self.window.show_view(accueil)
             return
 
         if self.show_menu:
@@ -659,7 +776,9 @@ class FanoronteloView(arcade.View):
 
     def on_mouse_release(self, x, y, button, modifiers):
         self.undo_button.on_mouse_release()
+        self.redo_button.on_mouse_release()
         self.menu_button.on_mouse_release()
+        self.skin_button.on_mouse_release()
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.R:
@@ -669,7 +788,6 @@ class FanoronteloView(arcade.View):
         elif key == arcade.key.Y:
             self.redo()
         elif key == arcade.key.M:
-            # Retour à l'accueil
             from accueil import AccueilView
             accueil = AccueilView()
             self.window.show_view(accueil)
@@ -695,10 +813,16 @@ class FanoronteloView(arcade.View):
                 duration=max(remaining, 0.05)
             )
             self.fly_anim = new_anim
+
+        # Repositionnement des boutons de contrôle
         self.undo_button.x = width - 70
-        self.undo_button.y = height - 200
+        self.undo_button.y = height - 150
+        self.redo_button.x = width - 70
+        self.redo_button.y = height - 210
         self.menu_button.x = width - 70
-        self.menu_button.y = height - 260
+        self.menu_button.y = height - 270
+        self.skin_button.x = width - 70
+        self.skin_button.y = height - 330
 
     # ----------------------------------------------------------------------
     # MISE À JOUR
@@ -726,9 +850,16 @@ class FanoronteloView(arcade.View):
         self.draw_fly_piece()
         self.draw_hud()
 
+        # Boutons (Undo, Redo, Menu)
         enabled_undo = bool(self.undo_stack) and self.fly_anim is None and not self.demo_mode
         self.undo_button.draw(enabled_undo)
-        self.menu_button.draw(active=self.show_menu)
+
+        enabled_redo = bool(self.redo_stack) and self.fly_anim is None and not self.demo_mode
+        self.redo_button.draw(enabled_redo)
+
+        self.menu_button.draw(True)   # toujours actif
+
+        self.skin_button.draw(active=self.show_menu)
 
         if self.show_menu:
             self.draw_menu()
@@ -913,7 +1044,6 @@ class FanoronteloView(arcade.View):
         else:
             color = PLAYER_COLORS[self.engine.tour]["light"]
 
-        # Affichage du message + temps IA éventuel
         msg = self.message
         if self.last_ia_time_ms > 0 and not self.winner:
             if self.demo_mode or (self.game_mode == "HvIA" and self.engine.tour == 2):
@@ -927,12 +1057,16 @@ class FanoronteloView(arcade.View):
             arcade.draw_text(f"Bleu — pions bougés : {moved_p2}/3", w//2, h-120, PLAYER_COLORS[2]["light"], 12)
             self.draw_piece(w-60, h-32, self.engine.tour, node_id=None)
 
+        # Bandeau bas (commandes)
         arcade.draw_lrbt_rectangle_filled(0, w, 0, 40, (12,14,22,230))
         arcade.draw_text(
-            "Clic : sélectionner / déplacer   |   R : recommencer   |   U : undo   |   Y : redo   |   M : menu   |   Échap : quitter",
-            24, 20, (170,170,185), 11, anchor_y="center"
+            "Clic : jouer | R:reset | U:undo | Y:redo | M:menu | Échap:quitter",
+            w / 2, 20, (170,170,185), 10, anchor_x="center", anchor_y="center"
         )
-        arcade.draw_text("Règle : aligner 3 pions ayant tous bougé", w - 24, 20, (130, 130, 150), 11, anchor_x="right", anchor_y="center")
+        arcade.draw_text(
+            "Règle : aligner 3 pions ayant tous bougé",
+            w - 24, 20, (130, 130, 150), 11, anchor_x="right", anchor_y="center"
+        )
 
         if self.winner:
             bw, bh = 360, 120
