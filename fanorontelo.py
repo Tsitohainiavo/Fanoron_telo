@@ -7,6 +7,7 @@ Jeu de stratégie malgache traditionnel.
 import arcade
 import math
 import time
+import alphabeta
 
 # ----------------------------------------------------------------------
 # CONFIGURATION GÉNÉRALE
@@ -378,10 +379,29 @@ class FanoronteloView(arcade.View):
 
     def switch_player(self):
         self.engine.tour = 2 if self.engine.tour == 1 else 1
-        self.message = (
-            f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']} — "
-            "Sélectionnez un pion"
-        )
+        
+        if self.winner:
+            return
+
+        # Si c'est au tour du Joueur 2 (l'IA en Bleu)
+        if self.engine.tour == 2:
+            self.message = f"L'IA ({PLAYER_COLORS[2]['name']}) réfléchit..."
+            
+            # Calcul du meilleur coup (profondeur 6 pour un niveau Difficile imbattable)
+            _, src_idx, dst_idx = alphabeta.alpha_beta(
+                self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'), joueur_max=2
+            )
+            
+            # Si un coup valide est trouvé, on lance l'animation de vol
+            if src_idx is not None and dst_idx is not None:
+                node_src = NODE_IDS[src_idx]
+                node_dst = NODE_IDS[dst_idx]
+                self._start_fly(node_src, node_dst)
+        else:
+            self.message = (
+                f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']} — "
+                "Sélectionnez un pion"
+            )
 
     # ------------------------------------------------------------------
     # ENTRÉES
@@ -391,7 +411,8 @@ class FanoronteloView(arcade.View):
             self.hovered_node = self.node_at_pixel(x, y)
 
     def on_mouse_press(self, x, y, button, modifiers):
-        if self.winner is not None or self.fly_anim is not None:
+        # Bloquer le clic si victoire, si un vol est en cours, ou si c'est au tour de l'IA (Joueur 2)
+        if self.winner is not None or self.fly_anim is not None or self.engine.tour == 2:
             return
         node = self.node_at_pixel(x, y)
         if node is None:
