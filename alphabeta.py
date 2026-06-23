@@ -3,8 +3,35 @@ MODULE IA - FANORONTELO TELO
 Algorithme Alpha-Bêta avec structures Bitboards et Move Ordering.
 """
 
-# On récupère les constantes de géométrie du plateau depuis le fichier principal
-from fanorontelo import ADJACENCY_MASKS, WINNING_MASKS, NODE_TO_BIT
+# CONSTANTES GÉOMÉTRIQUES
+NODE_IDS = ["NO", "N", "NE", "O", "C", "E", "SO", "S", "SE"]
+NODE_TO_BIT = {name: idx for idx, name in enumerate(NODE_IDS)}
+
+EDGES = [
+    ("NO","N"),  ("N","NE"), ("SO","S"),  ("S","SE"),
+    ("NO","O"),  ("O","SO"), ("NE","E"),  ("E","SE"),
+    ("N","C"),   ("C","S"),  ("O","C"),   ("C","E"),
+    ("NO","C"),  ("C","SE"), ("NE","C"),  ("C","SO"),
+]
+
+WINNING_LINES = [
+    ("NO","N","NE"), ("SO","S","SE"), ("NO","O","SO"), ("NE","E","SE"),
+    ("N","C","S"),  ("O","C","E"),  ("NO","C","SE"), ("NE","C","SO"),
+]
+
+ADJACENCY_MASKS = {i: 0 for i in range(9)}
+for _a, _b in EDGES:
+    bit_a = NODE_TO_BIT[_a]
+    bit_b = NODE_TO_BIT[_b]
+    ADJACENCY_MASKS[bit_a] |= (1 << bit_b)
+    ADJACENCY_MASKS[bit_b] |= (1 << bit_a)
+
+WINNING_MASKS = []
+for line in WINNING_LINES:
+    mask = 0
+    for node in line:
+        mask |= (1 << NODE_TO_BIT[node])
+    WINNING_MASKS.append(mask)
 
 def evaluer_position(engine, joueur_max):
     """

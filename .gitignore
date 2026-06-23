@@ -5,3 +5,5 @@
 *.cubin
 *.fatbin
 .fanorona
+__pycache__
+*pycache*

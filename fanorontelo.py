@@ -8,6 +8,7 @@ import arcade
 import math
 import time
 import alphabeta
+import moteur_ia
 
 # ----------------------------------------------------------------------
 # CONFIGURATION GÉNÉRALE
@@ -251,6 +252,10 @@ class FanoronteloView(arcade.View):
         self.board_cy = SCREEN_HEIGHT / 2 + 10
         self.scale    = 230
 
+        # Configuration des modes
+        self.game_mode = "HvH"       # "HvH" ou "HvIA"
+        self.ai_difficulty = "facile" # "facile", "moyen" ou "difficile"
+
         self.node_screen_pos = {}
         self.update_node_positions()
 
@@ -271,6 +276,12 @@ class FanoronteloView(arcade.View):
             for n in NODE_IDS
         }
 
+    def configure_game(self, mode, diff):
+        """Appelée par l'accueil pour configurer la partie."""
+        self.game_mode = mode
+        self.ai_difficulty = diff
+        self.reset_game()
+
     def on_show_view(self):
         arcade.set_background_color((15, 17, 26))
 
@@ -284,7 +295,9 @@ class FanoronteloView(arcade.View):
         self.fly_anim        = None
         self.flying_from     = None
         self.flying_to       = None
-        self.message = f"Déplacez un pion — Joueur {PLAYER_COLORS[1]['name']}"
+        
+        mode_str = f" vs IA ({self.ai_difficulty})" if self.game_mode == "HvIA" else " vs Humain"
+        self.message = f"Déplacez un pion — Joueur {PLAYER_COLORS[1]['name']}{mode_str}"
 
     def node_at_pixel(self, x, y):
         best, best_d = None, 1e9
@@ -383,23 +396,48 @@ class FanoronteloView(arcade.View):
         if self.winner:
             return
 
-        # Si c'est au tour du Joueur 2 (l'IA en Bleu)
-        if self.engine.tour == 2:
-            self.message = f"L'IA ({PLAYER_COLORS[2]['name']}) réfléchit..."
+        # Si le mode IA est actif et que c'est au tour du Joueur 2 (Bleu)
+        if self.game_mode == "HvIA" and self.engine.tour == 2:
+            self.message = f"L'IA ({self.ai_difficulty}) réfléchit..."
             
-            # Calcul du meilleur coup (profondeur 6 pour un niveau Difficile imbattable)
-            _, src_idx, dst_idx = alphabeta.alpha_beta(
-                self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'), joueur_max=2
-            )
-            
-            # Si un coup valide est trouvé, on lance l'animation de vol
+            src_idx, dst_idx = None, None
+
+            if self.ai_difficulty in ["facile", "moyen"]:
+                # --- APPEL AU CODE DU LEAD IA (moteur_ia.py) ---
+                # Le moteur_ia retourne un objet FanoronteloEngine complet (nouvel état)
+                prochain_etat = moteur_ia.obtenir_coup_ia(self.engine, niveau=self.ai_difficulty)
+                
+                if prochain_etat:
+                    # Pour lancer l'animation visuelle, on doit retrouver quel pion a bougé
+                    # en comparant l'ancien bitboard et le nouveau
+                    ancien_bb = self.engine.bitboard_p2
+                    nouveau_bb = prochain_etat.bitboard_p2
+                    
+                    # Le bit extrait de l'ancien qui n'est plus là = src
+                    bit_perdu = ancien_bb & ~nouveau_bb
+                    # Le bit apparu dans le nouveau = dst
+                    bit_gagne = nouveau_bb & ~ancien_bb
+                    
+                    if bit_perdu and bit_gagne:
+                        src_idx = int(math.log2(bit_perdu))
+                        dst_idx = int(math.log2(bit_gagne))
+
+            elif self.ai_difficulty == "difficile":
+                # --- APPEL À TON ALPHA-BETA OPTIMISÉ (alphabeta.py) ---
+                # Ton module retourne directement les index binaires du coup (src, dst)
+                _, src_idx, dst_idx = alphabeta.alpha_beta(
+                    self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'), joueur_max=2
+                )
+
+            # Lancement de l'animation si un coup a été calculé
             if src_idx is not None and dst_idx is not None:
                 node_src = NODE_IDS[src_idx]
                 node_dst = NODE_IDS[dst_idx]
                 self._start_fly(node_src, node_dst)
         else:
+            mode_str = " (IA)" if self.game_mode == "HvIA" else ""
             self.message = (
-                f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']} — "
+                f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']}{mode_str} — "
                 "Sélectionnez un pion"
             )
 
@@ -411,9 +449,12 @@ class FanoronteloView(arcade.View):
             self.hovered_node = self.node_at_pixel(x, y)
 
     def on_mouse_press(self, x, y, button, modifiers):
-        # Bloquer le clic si victoire, si un vol est en cours, ou si c'est au tour de l'IA (Joueur 2)
-        if self.winner is not None or self.fly_anim is not None or self.engine.tour == 2:
+        # Bloquer le clic humain si victoire, animation active, ou si c'est au tour de l'IA
+        if self.winner is not None or self.fly_anim is not None:
             return
+        if self.game_mode == "HvIA" and self.engine.tour == 2:
+            return
+            
         node = self.node_at_pixel(x, y)
         if node is None:
             return
