@@ -1,3 +1,6 @@
+# benchmark.py
+"""Benchmark opposant l'IA alpha-bêta (profondeur 4) à l'IA moyenne (profondeur 2)
+   sur le moteur FanoronteloEngine (règle des pions ayant tous bougé)."""
 
 import json
 import time
@@ -5,103 +8,85 @@ from pathlib import Path
 from math import inf
 
 from alphabeta import alpha_beta
-from plateau import Plateau
+from engine import FanoronteloEngine  # moteur standard du jeu
 
-# Configuration du benchmark
+# Paramètres du benchmark
 NUM_PARTIES = 100
 DIFFICULTY_DEPTH = 4
 MEDIUM_DEPTH = 2
-MAX_TOURS_PAR_PARTIE = 100  # Sécurité vitale pour éviter les boucles infinies en phase 2
+MAX_TOURS_PAR_PARTIE = 100
 RESULTS_FILE = Path(__file__).with_name("benchmark_results.json")
 
 
 class BenchmarkIA:
-    """Classe représentant une IA lors du benchmark."""
+    """Représente une IA avec un nom, une profondeur et un numéro de joueur."""
     def __init__(self, name: str, depth: int, joueur: int):
         self.name = name
         self.depth = depth
         self.joueur = joueur
 
-    def choisir_coup(self, plateau: Plateau):
-        """Sélectionne et joue le meilleur coup selon l'algorithme Alpha-Bêta."""
+    def choisir_coup(self, engine: FanoronteloEngine):
+        """Appelle alpha_beta, applique le coup sur l'engine et retourne le coup + temps écoulé."""
         start = time.perf_counter()
-        
-        # Utilisation de -inf et inf pour une approche mathématique plus standard
-        _, coup = alpha_beta(plateau, self.depth, -inf, inf, self.joueur)
-        
+        score, src, dst = alpha_beta(engine, self.depth, -inf, inf, self.joueur)
         elapsed = time.perf_counter() - start
 
-        # Si l'IA n'a plus de coups possibles (bloquée)
-        if coup is None:
+        if src is None or dst is None:
             return None, elapsed
 
-        # Architecture explicite pour l'application du coup selon la phase
-        if len(coup) == 1:
-            plateau.play_placement(coup[0])
-        elif len(coup) == 2:
-            plateau.play_mouvement(coup[0], coup[1])
-        else:
-            # Sécurité de repli si une autre logique est attendue
-            plateau.jouer_coup(*coup)
-
-        # ATTENTION : Si tes méthodes play_placement/play_mouvement ne changent pas 
-        # le tour automatiquement, décommente la ligne ci-dessous :
-        # plateau.tour = -1 if plateau.tour == 1 else 1
-
-        return coup, elapsed
+        # Appliquer le mouvement
+        engine.valider_et_deplacer(src, dst)
+        return (src, dst), elapsed
 
 
 def jouer_partie(starting_player: str):
-    """Joue une partie complète entre l'IA difficile et moyenne."""
-    plateau = Plateau()
-    ia_difficile = BenchmarkIA("difficile", DIFFICULTY_DEPTH, plateau.JOUEUR_1)
-    ia_moyenne = BenchmarkIA("moyenne", MEDIUM_DEPTH, plateau.JOUEUR_2)
+    """Joue une partie complète en utilisant FanoronteloEngine."""
+    engine = FanoronteloEngine()
+    ia_difficile = BenchmarkIA("difficile", DIFFICULTY_DEPTH, 1)  # joueur 1
+    ia_moyenne = BenchmarkIA("moyenne", MEDIUM_DEPTH, 2)          # joueur 2
 
+    # Choix du joueur qui commence
     if starting_player == "moyenne":
-        plateau.tour = plateau.JOUEUR_2
+        engine.tour = 2
     else:
-        plateau.tour = plateau.JOUEUR_1
+        engine.tour = 1
 
     temps_difficile = []
     temps_moyenne = []
-    compteur_tours = 0
+    nb_tours = 0
 
-    while compteur_tours < MAX_TOURS_PAR_PARTIE:
-        # Vérification préalable du statut
-        statut = plateau.determiner_statut()
-        if statut != "EN_COURS":
-            break
+    while nb_tours < MAX_TOURS_PAR_PARTIE:
+        # Vérification des conditions de victoire (avec la règle "tous ont bougé")
+        if engine.verifier_alignement_et_mouvement(engine.bitboard_p1, engine.moved_once_p1):
+            return "difficile", temps_difficile, temps_moyenne
+        if engine.verifier_alignement_et_mouvement(engine.bitboard_p2, engine.moved_once_p2):
+            return "moyenne", temps_difficile, temps_moyenne
 
-        # Détermination de l'IA qui doit jouer
-        joueur_actif = ia_difficile if plateau.tour == ia_difficile.joueur else ia_moyenne
-        
-        # Exécution du coup
-        coup, elapsed = joueur_actif.choisir_coup(plateau)
-        
-        # Si aucun coup n'est possible, la partie s'arrête
+        # Déterminer l'IA qui joue
+        joueur_actif = ia_difficile if engine.tour == 1 else ia_moyenne
+        coup, elapsed = joueur_actif.choisir_coup(engine)
         if coup is None:
-            break 
+            break  # plus aucun mouvement légal
 
-        # Enregistrement des métriques
         if joueur_actif.name == "difficile":
             temps_difficile.append(elapsed)
         else:
             temps_moyenne.append(elapsed)
 
-        compteur_tours += 1
+        # Passer au tour suivant
+        engine.tour = 2 if engine.tour == 1 else 1
+        nb_tours += 1
 
-    # Détermination du vainqueur final
-    if plateau.verifier_alignement(plateau.bitboard_p1):
+    # Après la boucle, déterminer le vainqueur final
+    if engine.verifier_alignement_et_mouvement(engine.bitboard_p1, engine.moved_once_p1):
         return "difficile", temps_difficile, temps_moyenne
-    elif plateau.verifier_alignement(plateau.bitboard_p2):
+    elif engine.verifier_alignement_et_mouvement(engine.bitboard_p2, engine.moved_once_p2):
         return "moyenne", temps_difficile, temps_moyenne
-    
-    # Si max tours atteint ou aucun alignement
-    return "egalite", temps_difficile, temps_moyenne
+    else:
+        return "egalite", temps_difficile, temps_moyenne
 
 
 def main():
-    """Point d'entrée principal du script de benchmark."""
     results = {
         "total_parties": NUM_PARTIES,
         "victoires_difficile": 0,
@@ -119,8 +104,8 @@ def main():
 
     for idx in range(NUM_PARTIES):
         starting_player = "difficile" if idx % 2 == 0 else "moyenne"
-        winner, diff_times, medium_times_partie = jouer_partie(starting_player)
-        
+        winner, diff_times, med_times = jouer_partie(starting_player)
+
         if winner == "difficile":
             results["victoires_difficile"] += 1
         elif winner == "moyenne":
@@ -129,20 +114,26 @@ def main():
             results["egalites"] += 1
 
         difficult_times.extend(diff_times)
-        medium_times.extend(medium_times_partie)
+        medium_times.extend(med_times)
 
-    # Calcul final des statistiques de performance
+    # Calcul des moyennes
     if NUM_PARTIES > 0:
-        results["taux_victoire_difficile"] = round((results["victoires_difficile"] / NUM_PARTIES) * 100, 2)
-
+        results["taux_victoire_difficile"] = round(
+            (results["victoires_difficile"] / NUM_PARTIES) * 100, 2
+        )
     if difficult_times:
-        results["temps_reponse_moyen_difficile"] = round(sum(difficult_times) / len(difficult_times), 6)
+        results["temps_reponse_moyen_difficile"] = round(
+            sum(difficult_times) / len(difficult_times), 6
+        )
     if medium_times:
-        results["temps_reponse_moyen_moyenne"] = round(sum(medium_times) / len(medium_times), 6)
+        results["temps_reponse_moyen_moyenne"] = round(
+            sum(medium_times) / len(medium_times), 6
+        )
 
-    # Sauvegarde des résultats au format JSON
-    RESULTS_FILE.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
-    
+    # Sauvegarde des résultats
+    RESULTS_FILE.write_text(
+        json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     print("\n--- Benchmark Terminé ---")
     print(json.dumps(results, indent=2, ensure_ascii=False))
 
