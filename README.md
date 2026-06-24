@@ -11,7 +11,7 @@
 
 | Nom Complet | Numéro d'étudiant | Classe | Rôle précis pour ce Hackathon |
 | :--- | :---: | :---: | :--- |
-| ANDRIAMPARANY Tsitohain'Ny Avo Fisandratana| 04 | ISAIA4 | Lead DevOps, Optimisation Bitboard |
+| ANDRIAMPARANY Tsitohain'Ny Avo Fisandratana| 04 | ISAIA4 | Lead DevOps, Optimisation Bitboard, Backend |
 | ANDRIAKOTO Rah-Yowan | 08 | IGGLIA4 | UI/UX Designer, Intégration graphique |
 | ANDRIANARILALA Tsiory Fanantenana | 24 | IGGLIA4 | Backend Architect, Moteur de règles |
 | RAHARIVOLOLONA Nomenjanahary Nathalie | 20 | ISAIA4 | Lead IA, Tests & Performances |
@@ -53,7 +53,7 @@ Fanoron‑telo – un jeu de plateau traditionnel malgache, programmé en Python
 - **Performance** : Mesure du temps de réflexion de l’IA (affiché en millisecondes dans le HUD)
 
 **Lien vers la version hébergée :**  
-*Non disponible pour le moment – l’exécutable peut être généré avec PyInstaller et mis en ligne sur itch.io.*
+*Non disponible pour le moment, en cours d'elaboration *
 
 ---
 
@@ -61,7 +61,7 @@ Fanoron‑telo – un jeu de plateau traditionnel malgache, programmé en Python
 
 ```bash
 git clone https://github.com/Tsitohainiavo/Fanoron_telo.git
-pip install arcade
+pip install -r requirements.txt
 python accueil.py
 ```
 
