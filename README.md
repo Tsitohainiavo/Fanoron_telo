@@ -76,3 +76,44 @@ Fanoron‑telo – un jeu de plateau traditionnel malgache, programmé en Python
 git clone https://github.com/Tsitohainiavo/Fanoron_telo.git
 pip install arcade
 python accueil.py
+```
+
+## Section 4 : Outils d'Aide IA Utilisés
+
+Tout au long du développement, notre équipe a utilisé **Claude et Gemini** comme assistant.Nous les avons utilisés pour nous aider à structurer, à optimiser notre code afin d'avoir des performances optimales. Pour nous documenter vis-à-vis de la bibliothèque arcade, nous avons utilisé claude. 
+
+**Exemples d’utilisation concrète :**
+- **Écriture d’algorithmes** : Optimisation de la structure Minimax avec élagage Alpha‑Beta.
+- **Débogage** : identification rapide des erreurs liés à l'integration.
+- **Génération de l’interface** : aide à la création des classes de boutons (Undo, Redo, Skin), optimisation de l’affichage du HUD.
+
+**Retour d’expérience :**  
+L’IA a permis de gagner environ **60 % du temps total**, principalement sur les parties algorithmiques et le débogage. Les suggestions devaient toujours être vérifiées car certaines ne respectaient pas les spécificités d’Arcade (ex. `draw_rectangle_filled` inexistant dans la version utilisée).
+
+---
+
+## Section 5 : Modélisation et Algorithmes de l'IA du Jeu
+
+### Représentation de l'état du plateau
+
+L’état du jeu est stocké dans deux **entiers 9 bits** (bitboards), un pour chaque joueur. Chaque bit correspond à une intersection du plateau 3×3, selon le schéma :
+
+Chaque bit du bitboard correspond à une intersection spécifique du plateau $3 \times 3$ :
+
+* **Bit 0** : NO (Nord-Ouest)
+* **Bit 1** : N (Nord)
+* **Bit 2** : NE (Nord-Est)
+* **Bit 3** : O (Ouest)
+* **Bit 4** : C (Centre)
+* **Bit 5** : E (Est)
+* **Bit 6** : SO (Sud-Ouest)
+* **Bit 7** : S (Sud)
+* **Bit 8** : SE (Sud-Est)
+
+#### Matrice du plateau
+
+| Colonne Ouest | Colonne Centrale | Colonne Est |
+| :---: | :---: | :---: |
+| **Bit 0** (NO) | **Bit 1** (N) | **Bit 2** (NE) |
+| **Bit 3** (O)  | **Bit 4** (C) | **Bit 5** (E)  |
+| **Bit 6** (SO) | **Bit 7** (S) | **Bit 8** (SE) |
