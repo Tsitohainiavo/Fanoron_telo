@@ -9,27 +9,14 @@
 
 **Membres de l’équipe :**
 
-| Nom Complet       | Numéro d'étudiant | Classe | Rôle précis pour ce Hackathon          |
-|-------------------|-------------------|--------|----------------------------------------|
-| ANDRIAMPARANY     | 03                | ISAIA4 | Lead DevOps, Optimisation Bitboard     |
-|  Tsitohain'Ny Avo |                   |        |                                        |
-|-----------------------------------------------------------------------------------------|
-| ANDRIAKOTO        | 08                | IGGLIA4| UI/UX Designer, Intégration graphique  |
-| Rah-Yowan         |                   |        |                                        |
-|-----------------------------------------------------------------------------------------|
-| ANDRIANARILALA    | 24                | IGGLIA4| Backend Architect, Moteur de règles    |
-| Tsiory Fanantenana|                   |        |                                        |
-|-----------------------------------------------------------------------------------------|
-| RAHARIVOLOLONA    | 20                | ISAIA4 | Lead IA    , Tests & Performances      |
-|Nomenjanahary      |                   |        |                                        |
-|Nathalie           |                   |        |                                        |
-|-----------------------------------------------------------------------------------------|
-|ANDRIAMANJATO      | 02                | IGGLIA4| Redacteur technique,                   |
-|Henintsoa          |                   |        | Controle qualite                       |
-|-----------------------------------------------------------------------------------------|
-|RAZAFIMAHEFA       | 01                | IGGLIA4| BenchMarking,                          |
-|Sariaka            |                   |        | Tests fonctionnels                     |
-|-----------------------------------------------------------------------------------------|
+| Nom Complet | Numéro d'étudiant | Classe | Rôle précis pour ce Hackathon |
+| :--- | :---: | :---: | :--- |
+| ANDRIAMPARANY Tsitohain'Ny Avo | 03 | ISAIA4 | Lead DevOps, Optimisation Bitboard |
+| ANDRIAKOTO Rah-Yowan | 08 | IGGLIA4 | UI/UX Designer, Intégration graphique |
+| ANDRIANARILALA Tsiory Fanantenana | 24 | IGGLIA4 | Backend Architect, Moteur de règles |
+| RAHARIVOLOLONA Nomenjanahary Nathalie | 20 | ISAIA4 | Lead IA, Tests & Performances |
+| ANDRIAMANJATO Henintsoa | 02 | IGGLIA4 | Rédacteur technique, Contrôle qualité |
+| RAZAFIMAHEFA Sariaka | 01 | IGGLIA4 | Benchmarking, Tests fonctionnels |
 
 
 ## Section 2 : Description du Travail Réalisé
