@@ -696,7 +696,7 @@ class FanoronteloView(arcade.View):
                 else:
                     self.message = f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']} — Aucun mouvement possible"
         else:
-            mode_str = " (IA)" if self.game_mode == "HvIA" else ""
+            mode_str = " " if self.game_mode == "HvIA" else ""
             self.message = f"Au tour de {PLAYER_COLORS[self.engine.tour]['name']}{mode_str} — Sélectionnez un pion"
 
     # ----------------------------------------------------------------------
@@ -1053,8 +1053,6 @@ class FanoronteloView(arcade.View):
         if not self.winner:
             moved_p1 = bin(self.engine.moved_once_p1).count("1")
             moved_p2 = bin(self.engine.moved_once_p2).count("1")
-            arcade.draw_text(f"Rouge — pions bougés : {moved_p1}/3", 24, h-120, PLAYER_COLORS[1]["light"], 12)
-            arcade.draw_text(f"Bleu — pions bougés : {moved_p2}/3", w//2, h-120, PLAYER_COLORS[2]["light"], 12)
             self.draw_piece(w-60, h-32, self.engine.tour, node_id=None)
 
         # Bandeau bas (commandes)
@@ -1065,7 +1063,9 @@ class FanoronteloView(arcade.View):
         )
         arcade.draw_text(
             "Règle : aligner 3 pions ayant tous bougé",
-            w - 24, 20, (130, 130, 150), 11, anchor_x="right", anchor_y="center"
+            # w - 24, 20, (130, 130, 150), 11, anchor_x="right", anchor_y="center"
+             w / 2, 40, (130, 130, 150), 10, anchor_x="center", anchor_y="center"
+
         )
 
         if self.winner:
