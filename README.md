@@ -53,7 +53,7 @@ Fanoron‑telo – un jeu de plateau traditionnel malgache, programmé en Python
 - **Performance** : Mesure du temps de réflexion de l’IA (affiché en millisecondes dans le HUD)
 
 **Lien vers la version hébergée :**  
-*Non disponible pour le moment, en cours d'elaboration *
+*Cette application est une version desktop telechargeable sous [https://tsitohainiavo.itch.io/fanoron-telo] ou [https://github.com/Tsitohainiavo/Fanoron_telo/releases/tag/V1.0.0]*
 
 ---
 
