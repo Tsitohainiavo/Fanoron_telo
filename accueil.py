@@ -1,3 +1,6 @@
+# accueil.py
+"""Écran d'accueil du jeu Fanoron-telo."""
+
 import arcade
 import math
 from fanorontelo import FanoronteloView, COLOR_BG_TOP, COLOR_BG_BOTTOM, PLAYER_COLORS
@@ -5,12 +8,12 @@ from fanorontelo import FanoronteloView, COLOR_BG_TOP, COLOR_BG_BOTTOM, PLAYER_C
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 760
 SCREEN_TITLE = "Fanoron-telo - Menu Principal"
-
 DESIGN_HEIGHT = 760
 MENU_MID_Y = 310
 
+
 class Button:
-    def __init__(self, x, y, width, height, text, value, group=None):
+    def __init__(self, x, y, width, height, text, value, group=None, style="normal"):
         self.x = x
         self.base_y = y
         self.width = width
@@ -18,26 +21,42 @@ class Button:
         self.text = text
         self.value = value
         self.group = group
+        self.style = style          # "normal" ou "highlight"
         self.is_hovered = False
         self.is_selected = False
 
     def draw(self, offset_y=0):
         current_y = self.base_y + offset_y
-        if self.is_selected:
-            bg_color = (40, 60, 110, 240)
-            border_color = (255, 215, 110)
-            text_color = (255, 215, 110)
-            border_thick = 3
-        elif self.is_hovered:
-            bg_color = (30, 36, 56, 220)
-            border_color = (150, 210, 255)
-            text_color = (255, 255, 255)
+
+        # Couleurs de base selon le style
+        if self.style == "highlight":
+            # Doré similaire au titre, mais statique
+            bg_color = (240, 210, 140)      # fond doré chaud
+            border_color = (240, 210, 140)      # bordure plus claire
+            text_color = (30, 25, 10)           # texte très sombre
             border_thick = 2
         else:
             bg_color = (18, 22, 36, 200)
             border_color = (80, 90, 120)
             text_color = (170, 170, 185)
             border_thick = 1
+
+        # États interactifs
+        if self.is_selected:
+            bg_color = (40, 60, 110, 240)
+            border_color = (255, 215, 110)
+            text_color = (255, 215, 110)
+            border_thick = 3
+        elif self.is_hovered:
+            if self.style == "highlight":
+                bg_color = (220, 190, 80, 240)   # un peu plus clair au survol
+                text_color = (0, 0, 0)
+                border_color = (255, 230, 160)
+            else:
+                bg_color = (30, 36, 56, 220)
+                border_color = (150, 210, 255)
+                text_color = (255, 255, 255)
+            border_thick = 2
 
         left = self.x - self.width / 2
         right = self.x + self.width / 2
@@ -50,7 +69,7 @@ class Button:
             self.text, self.x, current_y,
             text_color, 15,
             anchor_x="center", anchor_y="center",
-            bold=self.is_selected
+            bold=True   # toujours en gras pour ce bouton distinctif
         )
 
     def check_hover(self, x, y, offset_y=0):
@@ -59,6 +78,7 @@ class Button:
             self.x - self.width / 2 <= x <= self.x + self.width / 2 and
             current_y - self.height / 2 <= y <= current_y + self.height / 2
         )
+
 
 class AccueilView(arcade.View):
     def __init__(self):
@@ -79,7 +99,7 @@ class AccueilView(arcade.View):
         self.btn_diff_difficile = Button(cx + 130, 250, 110, 46, "Difficile", "difficile", "diff")
 
         self.btn_play = Button(cx, 150, 260, 56, "LANCER LE JEU", "play", None)
-        self.btn_demo = Button(cx, 80, 260, 56, "Demo : IA vs IA", "demo", None)
+        self.btn_demo = Button(cx, 80, 260, 56, "Demo : IA vs IA", "demo", None, style="highlight")
 
         self.buttons = [
             self.btn_mode_hvh,
@@ -176,9 +196,9 @@ class AccueilView(arcade.View):
             self.window.show_view(game_view)
 
         if self.btn_demo.is_hovered:
-            selected_diff = next(b.value for b in self.buttons if b.group == "diff" and b.is_selected)
+            # Lance le match AlphaBeta vs Moyen
             game_view = FanoronteloView()
-            game_view.configure_demo(difficulty=selected_diff)
+            game_view.configure_demo_ab_vs_moyen()
             self.window.show_view(game_view)
 
 
