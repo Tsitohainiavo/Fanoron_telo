@@ -23,7 +23,7 @@ def build():
 
     # Arguments de PyInstaller
     args = [
-        str(root_dir / "fanorontelo.py"),  # script principal
+        str(root_dir / "accueil.py"),  # script principal
         "--name", APP_NAME,
         "--onedir",
         "--windowed",                     # sans console sur Windows
