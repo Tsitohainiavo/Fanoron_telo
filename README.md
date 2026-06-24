@@ -11,7 +11,7 @@
 
 | Nom Complet | Numéro d'étudiant | Classe | Rôle précis pour ce Hackathon |
 | :--- | :---: | :---: | :--- |
-| ANDRIAMPARANY Tsitohain'Ny Avo Fisandratana| 03 | ISAIA4 | Lead DevOps, Optimisation Bitboard |
+| ANDRIAMPARANY Tsitohain'Ny Avo Fisandratana| 04 | ISAIA4 | Lead DevOps, Optimisation Bitboard |
 | ANDRIAKOTO Rah-Yowan | 08 | IGGLIA4 | UI/UX Designer, Intégration graphique |
 | ANDRIANARILALA Tsiory Fanantenana | 24 | IGGLIA4 | Backend Architect, Moteur de règles |
 | RAHARIVOLOLONA Nomenjanahary Nathalie | 20 | ISAIA4 | Lead IA, Tests & Performances |
