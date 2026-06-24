@@ -11,7 +11,7 @@
 
 | Nom Complet       | Numéro d'étudiant | Classe | Rôle précis pour ce Hackathon          |
 |-------------------|-------------------|--------|----------------------------------------|
-| ANDRIAMPARANY     | 03                | ISAIA4 | Lead AI, Optimisation Bitboard         |
+| ANDRIAMPARANY     | 03                | ISAIA4 | Lead DevOps, Optimisation Bitboard     |
 |  Tsitohain'Ny Avo |                   |        |                                        |
 |-----------------------------------------------------------------------------------------|
 | ANDRIAKOTO        | 08                | IGGLIA4| UI/UX Designer, Intégration graphique  |
@@ -20,15 +20,15 @@
 | ANDRIANARILALA    | 24                | IGGLIA4| Backend Architect, Moteur de règles    |
 | Tsiory Fanantenana|                   |        |                                        |
 |-----------------------------------------------------------------------------------------|
-| RAHARIVOLOLONA    | 20                | ISAIA4 | Lead DevOps, Tests & Performances      |
+| RAHARIVOLOLONA    | 20                | ISAIA4 | Lead IA    , Tests & Performances      |
 |Nomenjanahary      |                   |        |                                        |
 |Nathalie           |                   |        |                                        |
 |-----------------------------------------------------------------------------------------|
-|ANDRIAMANJATO      | 02                | IGGLIA4|                                        |
-|Henintsoa          |                   |        |                                        |
+|ANDRIAMANJATO      | 02                | IGGLIA4| Redacteur technique,                   |
+|Henintsoa          |                   |        | Controle qualite                       |
 |-----------------------------------------------------------------------------------------|
-|RAZAFIMAHEFA       | 01                | IGGLIA4|                                        |
-|Sariaka            |                   |        |                                        |
+|RAZAFIMAHEFA       | 01                | IGGLIA4| BenchMarking,                          |
+|Sariaka            |                   |        | Tests fonctionnels                     |
 |-----------------------------------------------------------------------------------------|
 
 
@@ -62,7 +62,7 @@ Fanoron‑telo – un jeu de plateau traditionnel malgache, programmé en Python
 - **Moteur de jeu** : Représentation **bitboard** pour une manipulation ultra‑rapide des positions (9 bits par joueur)
 - **IA** :
   - Niveau Facile/Moyen : sélection aléatoire parmi les successeurs légaux - module `moteur_ia.py`
-  - Niveau Difficile : Minimax + Alpha‑Beta sur profondeur 6 → module `alphabeta.py`
+  - Niveau Difficile : Minimax + Alpha‑Beta sur profondeur 6 - module `alphabeta.py`
 - **Performance** : Mesure du temps de réflexion de l’IA (affiché en millisecondes dans le HUD)
 
 **Lien vers la version hébergée :**  
