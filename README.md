@@ -11,11 +11,11 @@
 
 | Nom Complet | Numéro d'étudiant | Classe | Rôle précis pour ce Hackathon |
 | :--- | :---: | :---: | :--- |
-| ANDRIAMPARANY Tsitohain'Ny Avo | 03 | ISAIA4 | Lead DevOps, Optimisation Bitboard |
+| ANDRIAMPARANY Tsitohain'Ny Avo Fisandratana| 03 | ISAIA4 | Lead DevOps, Optimisation Bitboard |
 | ANDRIAKOTO Rah-Yowan | 08 | IGGLIA4 | UI/UX Designer, Intégration graphique |
 | ANDRIANARILALA Tsiory Fanantenana | 24 | IGGLIA4 | Backend Architect, Moteur de règles |
 | RAHARIVOLOLONA Nomenjanahary Nathalie | 20 | ISAIA4 | Lead IA, Tests & Performances |
-| ANDRIAMANJATO Henintsoa | 02 | IGGLIA4 | Rédacteur technique, Contrôle qualité |
+| ANDRIAMANJATO Nomenjanahary Henintsoa | 02 | IGGLIA4 | Rédacteur technique, Contrôle qualité |
 | RAZAFIMAHEFA Sariaka | 01 | IGGLIA4 | Benchmarking, Tests fonctionnels |
 
 
@@ -104,3 +104,53 @@ Chaque bit du bitboard correspond à une intersection spécifique du plateau $3 
 | **Bit 0** (NO) | **Bit 1** (N) | **Bit 2** (NE) |
 | **Bit 3** (O)  | **Bit 4** (C) | **Bit 5** (E)  |
 | **Bit 6** (SO) | **Bit 7** (S) | **Bit 8** (SE) |
+
+
+Cette représentation permet :
+- Vérification instantanée de l’occupation (`occupied = bb_p1 | bb_p2`).
+- Calcul des destinations légales via un masque d’adjacence pré‑calculé (`ADJACENCY_MASKS`).
+- Détection des alignements gagnants à l’aide de 8 masques (`WINNING_MASKS`).
+
+Un troisième bitboard (`moved_once`) suit les pions ayant déjà été déplacés.
+
+### Minimax et fonction d'évaluation
+
+L’IA difficile utilise un **Minimax avec élagage Alpha‑Beta** sur une profondeur fixe de 6.
+
+**Fonction d’évaluation statique** (simplifiée mais efficace) :
+- Si le joueur max gagne : +∞
+- Si le joueur min gagne : –∞
+- Sinon, score basé sur la proximité d’un alignement : nombre de lignes où le joueur possède déjà 2 pions et où la 3ᵉ case est libre.
+
+Cette heuristique guide l’IA vers des positions favorables sans explosion combinatoire.
+
+### Techniques avancée
+
+- **Bitboards** : Utilisés pour toutes les opérations de mouvement et de victoire.
+---
+
+## Section 6 : Analyses de Performances
+
+### Temps de réponse de l’IA
+
+Mesuré avec `time.perf_counter()` lors de chaque appel à l’IA, affiché en millisecondes dans l’interface.
+
+| Niveau de l'IA | Profondeur de recherche | Temps de réponse moyen (ms) | Algorithme et Observation |
+| :--- | :---: | :---: | :--- |
+| **Facile** | — | < 1 ms | Heuristique simple ou choix quasi-immédiat |
+| **Moyen** | — | < 1 ms | Évaluation basique à court terme |
+| **Difficile** | 6 | 15 – 50 ms | Algorithme Alpha-Beta optimisé avec bitboard |
+
+
+### Affrontements IA vs IA (Démo)
+
+Nous avons lancé **20 parties automatiques** IA Difficile contre IA Facile.
+
+- **Taux de victoire de l’IA Difficile** : 100 % (20/20)
+- **Taux de victoire de l’IA Difficile contre IA Moyen** : 95 % (19/20, un match nul causé par un blocage mutuel)
+
+Ces résultats confirment que l’IA Difficile exploite bien la profondeur 6 et la fonction d’évaluation pour dominer les niveaux inférieurs.
+
+---
+
+*Projet réalisé dans le cadre du Hackathon Algorithmique Avancée, ISPM – documents autorisés.*
