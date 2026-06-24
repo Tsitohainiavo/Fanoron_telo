@@ -5,7 +5,7 @@ from pathlib import Path
 from math import inf
 
 from alphabeta import alpha_beta
-from plateau import plateau
+from plateau import Plateau
 
 # Configuration du benchmark
 NUM_PARTIES = 100
