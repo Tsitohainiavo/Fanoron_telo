@@ -84,7 +84,7 @@ class FanoronteloView(arcade.View):
 
     # ---------- Réinitialisation ----------
     def reset_game(self):
-        self.engine.reset()
+        self.engine.reset(random_start=True)  # <-- aléatoire
         self.selected_node = None
         self.hovered_node = None
         self.winner = None
@@ -96,13 +96,19 @@ class FanoronteloView(arcade.View):
         self.undo_stack.clear()
         self.redo_stack.clear()
 
-        if self.game_mode == "demo":
+        # Détermination du message initial
+        nom_joueur_actif = PLAYER_COLORS[self.engine.tour]["name"]
+        if self.demo_mode:
             mode_str = "Démo IA vs IA"
         elif self.game_mode == "HvIA":
             mode_str = f" vs IA ({self.ai_difficulty})"
         else:
             mode_str = " vs Humain"
-        self.message = f"Déplacez un pion — Joueur {PLAYER_COLORS[1]['name']}{mode_str}"
+        self.message = f"Déplacez un pion — Joueur {nom_joueur_actif}{mode_str}"
+
+        # Si HvIA et que l'IA commence, on lance son coup
+        if self.game_mode == "HvIA" and self.engine.tour == 2:
+            self.switch_player()   # l'IA joue immédiatement
 
     # ---------- Gestion de l'historique ----------
     def save_state(self):
@@ -239,6 +245,8 @@ class FanoronteloView(arcade.View):
 
         self.switch_player()
 
+    
+
     def switch_player(self):
         self.engine.tour = 2 if self.engine.tour == 1 else 1
         if self.winner:
@@ -265,7 +273,7 @@ class FanoronteloView(arcade.View):
             if self.demo_mode:
                 if self.engine.tour == 1:   # AlphaBeta
                     _, src_idx, dst_idx = alphabeta.alpha_beta(
-                        self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'),
+                        self.engine, profondeur=8, alpha=-float('inf'), beta=float('inf'),
                         joueur_max=self.engine.tour
                     )
                 else:   # Moyen (minimax profondeur 3)
@@ -299,7 +307,7 @@ class FanoronteloView(arcade.View):
                             dst_idx = int(math.log2(bit_gagne))
                 elif self.ai_difficulty == "difficile":
                     _, src_idx, dst_idx = alphabeta.alpha_beta(
-                        self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'),
+                        self.engine, profondeur=8, alpha=-float('inf'), beta=float('inf'),
                         joueur_max=self.engine.tour
                     )
 

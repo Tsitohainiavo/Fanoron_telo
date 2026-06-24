@@ -1,6 +1,7 @@
 """Moteur de jeu Fanorontelo (bitboards) et animation de déplacement."""
 
 import math
+import random
 from constants import (
     NODE_IDS, NODE_TO_BIT, ADJACENCY_MASKS, WINNING_MASKS,
     INITIAL_P1_BITBOARD, INITIAL_P2_BITBOARD, FLY_DURATION, FLY_HEIGHT
@@ -12,12 +13,15 @@ class FanoronteloEngine:
     def __init__(self):
         self.reset()
 
-    def reset(self):
+    def reset(self, random_start=False):
         self.bitboard_p1 = INITIAL_P1_BITBOARD
         self.bitboard_p2 = INITIAL_P2_BITBOARD
-        self.tour = 1
         self.moved_once_p1 = 0
         self.moved_once_p2 = 0
+        if random_start:
+            self.tour = random.randint(1, 2)
+        else:
+            self.tour = 1
 
     def get_occupied(self):
         return self.bitboard_p1 | self.bitboard_p2
