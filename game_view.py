@@ -84,7 +84,9 @@ class FanoronteloView(arcade.View):
 
     # ---------- Réinitialisation ----------
     def reset_game(self):
-        self.engine.reset(random_start=True)  # <-- aléatoire
+        # Réinitialisation avec premier joueur aléatoire
+        self.engine.reset(random_start=True)
+
         self.selected_node = None
         self.hovered_node = None
         self.winner = None
@@ -96,20 +98,21 @@ class FanoronteloView(arcade.View):
         self.undo_stack.clear()
         self.redo_stack.clear()
 
-        # Détermination du message initial
-        nom_joueur_actif = PLAYER_COLORS[self.engine.tour]["name"]
+        # Message selon le mode
+        nom_joueur = PLAYER_COLORS[self.engine.tour]["name"]
         if self.demo_mode:
             mode_str = "Démo IA vs IA"
         elif self.game_mode == "HvIA":
             mode_str = f" vs IA ({self.ai_difficulty})"
         else:
             mode_str = " vs Humain"
-        self.message = f"Déplacez un pion — Joueur {nom_joueur_actif}{mode_str}"
+        self.message = f"Déplacez un pion — Joueur {nom_joueur}{mode_str}"
 
-        # Si HvIA et que l'IA commence, on lance son coup
+        # Si HvIA et que l'IA commence (tour = 2), on la fait jouer immédiatement
         if self.game_mode == "HvIA" and self.engine.tour == 2:
-            self.switch_player()   # l'IA joue immédiatement
-
+            self.message = f"L'IA ({self.ai_difficulty}) réfléchit..."
+            self._ia_joue()
+            
     # ---------- Gestion de l'historique ----------
     def save_state(self):
         if self.game_mode == "HvIA" and self.engine.tour != 1:
@@ -245,7 +248,42 @@ class FanoronteloView(arcade.View):
 
         self.switch_player()
 
-    
+    def _ia_joue(self, difficulty=None):
+        """Fait jouer l'IA pour le joueur dont c'est le tour.
+        Retourne True si un coup a été joué, False sinon."""
+        if difficulty is None:
+            difficulty = self.ai_difficulty
+
+        src_idx = dst_idx = None
+        t_start = time.perf_counter()
+
+        if difficulty in ["facile", "moyen"]:
+            prochain = moteur_ia.obtenir_coup_ia(self.engine, niveau=difficulty)
+            if prochain:
+                if self.engine.tour == 1:
+                    ancien = self.engine.bitboard_p1
+                    nouveau = prochain.bitboard_p1
+                else:
+                    ancien = self.engine.bitboard_p2
+                    nouveau = prochain.bitboard_p2
+                bit_perdu = ancien & ~nouveau
+                bit_gagne = nouveau & ~ancien
+                if bit_perdu and bit_gagne:
+                    src_idx = int(math.log2(bit_perdu))
+                    dst_idx = int(math.log2(bit_gagne))
+        else:  # difficile
+            _, src_idx, dst_idx = alphabeta.alpha_beta(
+                self.engine, profondeur=6, alpha=-float('inf'), beta=float('inf'),
+                joueur_max=self.engine.tour
+            )
+
+        t_end = time.perf_counter()
+        self.last_ia_time_ms = (t_end - t_start) * 1000
+
+        if src_idx is not None and dst_idx is not None:
+            self._start_fly(NODE_IDS[src_idx], NODE_IDS[dst_idx])
+            return True
+        return False
 
     def switch_player(self):
         self.engine.tour = 2 if self.engine.tour == 1 else 1
